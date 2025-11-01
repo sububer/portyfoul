@@ -20,8 +20,8 @@ A stock and crypto portfolio manager with a thin-client architecture.
 
 ### Prerequisites
 
-- Node.js 18.x or 20.x
-- npm or yarn
+- Node.js 20.x or higher
+- npm
 
 ### Installation
 
