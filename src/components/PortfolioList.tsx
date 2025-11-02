@@ -1,8 +1,8 @@
-import { Portfolio } from '@/types/portfolio';
+import { PortfolioWithValues } from '@/types/api';
 import PortfolioCard from './PortfolioCard';
 
 interface PortfolioListProps {
-  portfolios: Portfolio[];
+  portfolios: PortfolioWithValues[];
   onDelete: (id: string) => void;
 }
 

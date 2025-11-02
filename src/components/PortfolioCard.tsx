@@ -1,9 +1,9 @@
 'use client';
 
-import { Portfolio } from '@/types/portfolio';
+import { PortfolioWithValues } from '@/types/api';
 
 interface PortfolioCardProps {
-  portfolio: Portfolio;
+  portfolio: PortfolioWithValues;
   onDelete: (id: string) => void;
 }
 
@@ -44,37 +44,35 @@ export default function PortfolioCard({ portfolio, onDelete }: PortfolioCardProp
         <div className="stat">
           <span className="stat-label">Total Value</span>
           <span className="stat-value">
-            {portfolio.totalValue ? formatCurrency(portfolio.totalValue) : 'N/A'}
+            {formatCurrency(portfolio.totalValue)}
           </span>
         </div>
         <div className="stat">
-          <span className="stat-label">Assets</span>
-          <span className="stat-value">{portfolio.assets.length}</span>
+          <span className="stat-label">Holdings</span>
+          <span className="stat-value">{portfolio.holdings.length}</span>
         </div>
       </div>
 
       <div className="asset-list">
         <h3>Holdings</h3>
-        {portfolio.assets.length === 0 ? (
-          <p className="text-muted">No assets in this portfolio</p>
+        {portfolio.holdings.length === 0 ? (
+          <p className="text-muted">No holdings in this portfolio</p>
         ) : (
           <ul>
-            {portfolio.assets.map((asset) => (
-              <li key={asset.id} className="asset-item">
+            {portfolio.holdings.map((holding) => (
+              <li key={holding.assetSymbol} className="asset-item">
                 <div className="asset-info">
                   <span className="asset-name">
-                    {asset.symbol} - {asset.name}
+                    {holding.asset.symbol} - {holding.asset.name}
                   </span>
-                  <span className="asset-badge">{asset.type}</span>
+                  <span className="asset-badge">{holding.asset.type}</span>
                 </div>
                 <div className="asset-details">
-                  <span>Quantity: {asset.quantity}</span>
-                  {asset.currentPrice && (
-                    <span>
-                      {formatCurrency(asset.currentPrice)} × {asset.quantity} ={' '}
-                      {formatCurrency(asset.currentPrice * asset.quantity)}
-                    </span>
-                  )}
+                  <span>Quantity: {holding.quantity}</span>
+                  <span>
+                    {formatCurrency(holding.asset.currentPrice)} × {holding.quantity} ={' '}
+                    {formatCurrency(holding.totalValue)}
+                  </span>
                 </div>
               </li>
             ))}

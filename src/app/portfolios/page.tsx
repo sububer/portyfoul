@@ -1,77 +1,81 @@
 'use client';
 
-import { useState } from 'react';
-import { Portfolio } from '@/types/portfolio';
+import { useState, useEffect } from 'react';
+import { PortfolioWithValues, CreatePortfolioRequest, ApiResponse } from '@/types/api';
 import PortfolioList from '@/components/PortfolioList';
 import CreatePortfolioForm from '@/components/CreatePortfolioForm';
 
-// Dummy data
-const initialPortfolios: Portfolio[] = [
-  {
-    id: '1',
-    name: 'Tech Portfolio',
-    description: 'My technology stocks',
-    assets: [
-      {
-        id: 'a1',
-        name: 'Apple Inc.',
-        type: 'stock',
-        symbol: 'AAPL',
-        quantity: 10,
-        currentPrice: 178.50,
-      },
-      {
-        id: 'a2',
-        name: 'Microsoft Corporation',
-        type: 'stock',
-        symbol: 'MSFT',
-        quantity: 5,
-        currentPrice: 378.91,
-      },
-    ],
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-01-15'),
-    totalValue: 3679.55,
-  },
-  {
-    id: '2',
-    name: 'Crypto Holdings',
-    description: 'Cryptocurrency investments',
-    assets: [
-      {
-        id: 'a3',
-        name: 'Bitcoin',
-        type: 'crypto',
-        symbol: 'BTC',
-        quantity: 0.5,
-        currentPrice: 42000,
-      },
-      {
-        id: 'a4',
-        name: 'Ethereum',
-        type: 'crypto',
-        symbol: 'ETH',
-        quantity: 2,
-        currentPrice: 2200,
-      },
-    ],
-    createdAt: new Date('2024-02-01'),
-    updatedAt: new Date('2024-02-01'),
-    totalValue: 25400,
-  },
-];
-
 export default function PortfoliosPage() {
-  const [portfolios, setPortfolios] = useState<Portfolio[]>(initialPortfolios);
+  const [portfolios, setPortfolios] = useState<PortfolioWithValues[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleCreatePortfolio = (portfolio: Portfolio) => {
-    setPortfolios([...portfolios, portfolio]);
-    setShowCreateForm(false);
+  // Fetch portfolios from API
+  const fetchPortfolios = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch('/api/portfolios');
+      const result: ApiResponse<PortfolioWithValues[]> = await response.json();
+
+      if (result.error) {
+        setError(result.error);
+      } else if (result.data) {
+        setPortfolios(result.data);
+      }
+    } catch (err) {
+      setError('Failed to load portfolios');
+      console.error('Error fetching portfolios:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDeletePortfolio = (id: string) => {
-    setPortfolios(portfolios.filter(p => p.id !== id));
+  // Load portfolios on mount
+  useEffect(() => {
+    fetchPortfolios();
+  }, []);
+
+  const handleCreatePortfolio = async (request: CreatePortfolioRequest) => {
+    try {
+      const response = await fetch('/api/portfolios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+
+      const result: ApiResponse<PortfolioWithValues> = await response.json();
+
+      if (result.error) {
+        setError(result.error);
+      } else if (result.data) {
+        setPortfolios([...portfolios, result.data]);
+        setShowCreateForm(false);
+      }
+    } catch (err) {
+      setError('Failed to create portfolio');
+      console.error('Error creating portfolio:', err);
+    }
+  };
+
+  const handleDeletePortfolio = async (id: string) => {
+    try {
+      const response = await fetch(`/api/portfolios/${id}`, {
+        method: 'DELETE',
+      });
+
+      const result: ApiResponse<{ success: boolean }> = await response.json();
+
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setPortfolios(portfolios.filter(p => p.id !== id));
+      }
+    } catch (err) {
+      setError('Failed to delete portfolio');
+      console.error('Error deleting portfolio:', err);
+    }
   };
 
   return (
@@ -86,6 +90,15 @@ export default function PortfoliosPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="error-message">
+          {error}
+          <button className="btn btn-small" onClick={fetchPortfolios}>
+            Retry
+          </button>
+        </div>
+      )}
+
       {showCreateForm && (
         <CreatePortfolioForm
           onSubmit={handleCreatePortfolio}
@@ -93,10 +106,14 @@ export default function PortfoliosPage() {
         />
       )}
 
-      <PortfolioList
-        portfolios={portfolios}
-        onDelete={handleDeletePortfolio}
-      />
+      {loading ? (
+        <div className="loading-state">Loading portfolios...</div>
+      ) : (
+        <PortfolioList
+          portfolios={portfolios}
+          onDelete={handleDeletePortfolio}
+        />
+      )}
     </main>
   );
 }
