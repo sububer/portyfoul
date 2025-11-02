@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { portfolioStore } from '@/lib/data/portfolios';
+import { portfolioStore } from '@/lib/data/portfolios-db';
 import { CreatePortfolioRequest, ApiResponse, PortfolioWithValues } from '@/types/api';
 
 // GET /api/portfolios - List all portfolios
 // Future: Filter by userId from authentication
 export async function GET() {
   try {
-    const portfolios = portfolioStore.getAll();
+    const portfolios = await portfolioStore.getAll();
     return NextResponse.json<ApiResponse<PortfolioWithValues[]>>({
       data: portfolios,
     });
@@ -34,14 +34,16 @@ export async function POST(request: NextRequest) {
 
     // Create portfolio
     // Future: Add userId from authentication context
-    const portfolio = portfolioStore.create({
+    const portfolio = await portfolioStore.create({
       name: body.name.trim(),
       description: body.description?.trim(),
       holdings: body.holdings || [],
     });
 
+    const enriched = await portfolioStore.getById(portfolio.id);
+
     return NextResponse.json<ApiResponse<PortfolioWithValues>>(
-      { data: portfolioStore.getById(portfolio.id) },
+      { data: enriched },
       { status: 201 }
     );
   } catch (error) {

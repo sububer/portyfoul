@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:17.2
+    container_name: portyfoul-postgres
+    environment:
+      POSTGRES_DB: portyfoul
+      POSTGRES_USER: portyfoul
+      POSTGRES_PASSWORD: portyfoul
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portyfoul"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - portyfoul-network
+
+  # Next.js application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: portyfoul-app
+    environment:
+      NODE_ENV: production
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: portyfoul
+      POSTGRES_USER: portyfoul
+      POSTGRES_PASSWORD: portyfoul
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - portyfoul-network
+    command: >
+      sh -c "
+        echo 'Waiting for database to be ready...' &&
+        sleep 2 &&
+        echo 'Running database migrations...' &&
+        npm run db:migrate &&
+        echo 'Starting application...' &&
+        npm start
+      "
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  portyfoul-network:
+    driver: bridge

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { assetStore } from '@/lib/data/assets';
+import { assetStore } from '@/lib/data/assets-db';
 import { CreateAssetRequest, ApiResponse, Asset } from '@/types/api';
 
 // GET /api/assets - List all assets
 export async function GET() {
   try {
-    const assets = assetStore.getAll();
+    const assets = await assetStore.getAll();
     return NextResponse.json<ApiResponse<Asset[]>>({
       data: assets,
     });
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const symbol = body.symbol.trim().toUpperCase();
 
     // Check if asset already exists
-    if (assetStore.exists(symbol)) {
+    if (await assetStore.exists(symbol)) {
       return NextResponse.json<ApiResponse<never>>(
         { error: `Asset ${symbol} already exists` },
         { status: 409 }
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new asset
-    const asset = assetStore.create({
+    const asset = await assetStore.create({
       symbol,
       name: body.name.trim(),
       type: body.type,

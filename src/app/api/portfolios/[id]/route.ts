@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { portfolioStore } from '@/lib/data/portfolios';
+import { portfolioStore } from '@/lib/data/portfolios-db';
 import { UpdatePortfolioRequest, ApiResponse, PortfolioWithValues } from '@/types/api';
 
 type RouteContext = {
@@ -13,7 +13,7 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const portfolio = portfolioStore.getById(id);
+    const portfolio = await portfolioStore.getById(id);
 
     if (!portfolio) {
       return NextResponse.json<ApiResponse<never>>(
@@ -44,7 +44,7 @@ export async function PUT(
     const body = await request.json() as UpdatePortfolioRequest;
 
     // Check if portfolio exists
-    if (!portfolioStore.exists(id)) {
+    if (!(await portfolioStore.exists(id))) {
       return NextResponse.json<ApiResponse<never>>(
         { error: 'Portfolio not found' },
         { status: 404 }
@@ -65,8 +65,8 @@ export async function PUT(
     if (body.description !== undefined) updates.description = body.description.trim();
     if (body.holdings !== undefined) updates.holdings = body.holdings;
 
-    const updated = portfolioStore.update(id, updates);
-    const enriched = portfolioStore.getById(id);
+    await portfolioStore.update(id, updates);
+    const enriched = await portfolioStore.getById(id);
 
     return NextResponse.json<ApiResponse<PortfolioWithValues>>({
       data: enriched,
@@ -89,7 +89,7 @@ export async function DELETE(
     const { id } = await context.params;
 
     // Check if portfolio exists
-    if (!portfolioStore.exists(id)) {
+    if (!(await portfolioStore.exists(id))) {
       return NextResponse.json<ApiResponse<never>>(
         { error: 'Portfolio not found' },
         { status: 404 }
@@ -97,7 +97,7 @@ export async function DELETE(
     }
 
     // Delete portfolio
-    portfolioStore.delete(id);
+    await portfolioStore.delete(id);
 
     return NextResponse.json<ApiResponse<{ success: boolean }>>({
       data: { success: true },

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { assetStore } from '@/lib/data/assets';
+import { assetStore } from '@/lib/data/assets-db';
 import { ApiResponse, Asset } from '@/types/api';
 
 type RouteContext = {
@@ -13,7 +13,7 @@ export async function GET(
 ) {
   try {
     const { symbol } = await context.params;
-    const asset = assetStore.getBySymbol(symbol);
+    const asset = await assetStore.getBySymbol(symbol);
 
     if (!asset) {
       return NextResponse.json<ApiResponse<never>>(
