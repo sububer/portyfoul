@@ -83,6 +83,9 @@ a:hover {
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 /* Buttons */
@@ -380,4 +383,111 @@ a:hover {
 .nav-links a:hover {
   background: #2980b9;
   text-decoration: none;
+}
+
+/* Button Groups */
+.button-group {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* Portfolio Detail */
+.portfolio-detail {
+  margin-top: 1.5rem;
+}
+
+.portfolio-meta {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.stat-value-large {
+  font-size: 2rem;
+}
+
+/* Holdings Table */
+.holdings-table {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.holdings-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.holdings-table thead {
+  background: #f8f9fa;
+}
+
+.holdings-table th,
+.holdings-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.holdings-table th {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.holdings-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.text-right {
+  text-align: right;
+}
+
+/* Holdings Edit List */
+.holdings-edit-list {
+  margin-top: 1.5rem;
+}
+
+.holdings-edit-list table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.holdings-edit-list thead {
+  background: #f8f9fa;
+}
+
+.holdings-edit-list th,
+.holdings-edit-list td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.holdings-edit-list th {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.holdings-edit-list tr.removed {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.quantity-input {
+  width: 120px;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.quantity-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.help-text {
+  margin-top: 1rem;
+  font-style: italic;
 }

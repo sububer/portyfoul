@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { PortfolioWithValues } from '@/types/api';
 
 interface PortfolioCardProps {
@@ -82,6 +83,9 @@ export default function PortfolioCard({ portfolio, onDelete }: PortfolioCardProp
 
       <div className="card-footer">
         <span className="text-muted">Created {formatDate(portfolio.createdAt)}</span>
+        <Link href={`/portfolios/${portfolio.id}`} className="btn btn-primary btn-small">
+          View Details
+        </Link>
       </div>
     </div>
   );
