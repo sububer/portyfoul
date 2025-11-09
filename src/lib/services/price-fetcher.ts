@@ -1,11 +1,12 @@
 /**
  * Price Fetching Service
- * Fetches real-time prices from Finnhub API for stocks and cryptocurrencies
+ * Fetches real-time prices from Finnhub API for stocks and CoinGecko API for cryptocurrencies
  */
 
 import { config } from '../config';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
+const COINGECKO_BASE_URL = 'https://api.coingecko.com/api/v3';
 
 export interface PriceData {
   symbol: string;
@@ -22,31 +23,32 @@ export interface FinnhubQuoteResponse {
   t: number;  // Timestamp
 }
 
-export interface FinnhubCryptoCandlesResponse {
-  c: number[];  // Close prices
-  h: number[];  // High prices
-  l: number[];  // Low prices
-  o: number[];  // Open prices
-  s: string;    // Status
-  t: number[];  // Timestamps
-  v: number[];  // Volume
+export interface CoinGeckoPriceResponse {
+  [coinId: string]: {
+    usd: number;
+  };
 }
 
 /**
- * Maps crypto symbols to Finnhub exchange format
- * Finnhub requires format like "BINANCE:BTCUSDT"
+ * Maps crypto symbols to CoinGecko coin IDs
+ * See https://www.coingecko.com/en/api/documentation for available coins
  */
-const CRYPTO_SYMBOL_MAP: Record<string, string> = {
-  'BTC': 'BINANCE:BTCUSDT',
-  'ETH': 'BINANCE:ETHUSDT',
-  'BNB': 'BINANCE:BNBUSDT',
-  'SOL': 'BINANCE:SOLUSDT',
-  'ADA': 'BINANCE:ADAUSDT',
-  'XRP': 'BINANCE:XRPUSDT',
-  'DOT': 'BINANCE:DOTUSDT',
-  'DOGE': 'BINANCE:DOGEUSDT',
-  'AVAX': 'BINANCE:AVAXUSDT',
-  'MATIC': 'BINANCE:MATICUSDT',
+const CRYPTO_SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
+  'BTC': 'bitcoin',
+  'ETH': 'ethereum',
+  'BNB': 'binancecoin',
+  'SOL': 'solana',
+  'ADA': 'cardano',
+  'XRP': 'ripple',
+  'DOT': 'polkadot',
+  'DOGE': 'dogecoin',
+  'AVAX': 'avalanche-2',
+  'MATIC': 'matic-network',
+  'LINK': 'chainlink',
+  'UNI': 'uniswap',
+  'LTC': 'litecoin',
+  'BCH': 'bitcoin-cash',
+  'ATOM': 'cosmos',
 };
 
 /**
@@ -72,38 +74,42 @@ async function fetchStockPrice(symbol: string): Promise<number> {
 }
 
 /**
- * Fetches crypto price from Finnhub crypto candles endpoint
- * Gets the most recent closing price
+ * Fetches crypto price from CoinGecko API
+ * CoinGecko provides free crypto price data without requiring an API key
  */
 async function fetchCryptoPrice(symbol: string): Promise<number> {
-  // Map the simple symbol (BTC) to Finnhub format (BINANCE:BTCUSDT)
-  const finnhubSymbol = CRYPTO_SYMBOL_MAP[symbol];
+  // Map the simple symbol (BTC) to CoinGecko ID (bitcoin)
+  const coinGeckoId = CRYPTO_SYMBOL_TO_COINGECKO_ID[symbol];
 
-  if (!finnhubSymbol) {
-    throw new Error(`Unsupported crypto symbol: ${symbol}. Add mapping in CRYPTO_SYMBOL_MAP.`);
+  if (!coinGeckoId) {
+    throw new Error(`Unsupported crypto symbol: ${symbol}. Add mapping in CRYPTO_SYMBOL_TO_COINGECKO_ID.`);
   }
 
-  // Get data for the last hour (1-minute resolution)
-  const now = Math.floor(Date.now() / 1000);
-  const oneHourAgo = now - 3600;
+  // Build URL - CoinGecko free tier doesn't require an API key
+  // Optional: add x_cg_demo_api_key parameter if user has a demo API key
+  const url = new URL(`${COINGECKO_BASE_URL}/simple/price`);
+  url.searchParams.append('ids', coinGeckoId);
+  url.searchParams.append('vs_currencies', 'usd');
 
-  const url = `${FINNHUB_BASE_URL}/crypto/candles?symbol=${finnhubSymbol}&resolution=1&from=${oneHourAgo}&to=${now}&token=${config.finnhub.apiKey}`;
+  // Add API key if configured (optional for free tier)
+  if (config.coinGecko.apiKey) {
+    url.searchParams.append('x_cg_demo_api_key', config.coinGecko.apiKey);
+  }
 
-  const response = await fetch(url);
+  const response = await fetch(url.toString());
 
   if (!response.ok) {
-    throw new Error(`Finnhub API error for ${symbol}: ${response.status} ${response.statusText}`);
+    throw new Error(`CoinGecko API error for ${symbol}: ${response.status} ${response.statusText}`);
   }
 
-  const data: FinnhubCryptoCandlesResponse = await response.json();
+  const data: CoinGeckoPriceResponse = await response.json();
 
   // Check if we got valid data
-  if (data.s !== 'ok' || !data.c || data.c.length === 0) {
+  if (!data[coinGeckoId] || typeof data[coinGeckoId].usd !== 'number') {
     throw new Error(`No price data available for crypto symbol: ${symbol}`);
   }
 
-  // Return the most recent closing price
-  return data.c[data.c.length - 1];
+  return data[coinGeckoId].usd;
 }
 
 /**

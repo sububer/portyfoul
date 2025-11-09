@@ -16,6 +16,12 @@ export const config = {
     apiKey: process.env.FINNHUB_API_KEY || '',
   },
 
+  coinGecko: {
+    // Optional: CoinGecko API key for higher rate limits
+    // Free tier works without an API key but has lower rate limits
+    apiKey: process.env.COINGECKO_API_KEY || '',
+  },
+
   priceUpdate: {
     intervalMinutes: parseInt(process.env.PRICE_UPDATE_INTERVAL_MINUTES || '15', 10),
   },

@@ -36,6 +36,8 @@ services:
       POSTGRES_PASSWORD: portyfoul
       # Finnhub API configuration (read from host environment or .env file)
       FINNHUB_API_KEY: ${FINNHUB_API_KEY}
+      # CoinGecko API configuration (optional - free tier works without key)
+      COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
       PRICE_UPDATE_INTERVAL_MINUTES: ${PRICE_UPDATE_INTERVAL_MINUTES:-15}
     ports:
       - "3000:3000"
