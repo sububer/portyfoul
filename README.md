@@ -29,6 +29,25 @@ The easiest way to run the application is with Docker Compose:
 - Docker
 - Docker Compose
 
+#### Configuration
+
+Before running the application, you need to configure the Finnhub API key for automatic price updates:
+
+1. Get a free API key from [Finnhub](https://finnhub.io/register)
+2. Create a `.env` file in the project root:
+
+```bash
+# Copy the example env file
+cp .env.example .env
+```
+
+3. Edit `.env` and add your Finnhub API key:
+
+```bash
+FINNHUB_API_KEY=your_api_key_here
+PRICE_UPDATE_INTERVAL_MINUTES=15  # Optional, defaults to 15
+```
+
 #### Running with Docker
 
 ```bash
@@ -38,6 +57,11 @@ docker-compose up
 # The app will be available at http://localhost:3000
 # PostgreSQL will be available at localhost:5432
 ```
+
+The application will automatically:
+- Start the background price update worker
+- Fetch real-time prices from Finnhub API every 15 minutes (configurable)
+- Update all asset prices in the database
 
 To stop the application:
 
@@ -70,7 +94,8 @@ npm install
 # Copy the example env file
 cp .env.example .env
 
-# Edit .env with your database credentials
+# Edit .env with your database credentials and Finnhub API key
+# Get a free API key at https://finnhub.io/register
 ```
 
 3. Set up the database:
@@ -123,6 +148,49 @@ npm run db:migrate
 - `assets`: Stores all unique assets (stocks and crypto) with current prices
 - `portfolios`: Portfolio metadata and ownership information
 - `holdings`: Many-to-many relationship between portfolios and assets
+
+## Price Update Worker
+
+The application includes a background worker that automatically fetches and updates asset prices from the Finnhub API.
+
+### Configuration
+
+Configure the worker behavior through environment variables:
+
+- `FINNHUB_API_KEY`: Your Finnhub API key (required)
+- `PRICE_UPDATE_INTERVAL_MINUTES`: How often to update prices (default: 15 minutes)
+
+### Manual Price Updates
+
+You can manually trigger a price update via the admin API:
+
+```bash
+# Trigger a manual price update
+curl -X POST http://localhost:3000/api/admin/update-prices
+
+# Check worker status
+curl http://localhost:3000/api/admin/update-prices
+```
+
+### Supported Assets
+
+The price fetcher currently supports:
+
+**Stocks**: Any stock symbol available on Finnhub (e.g., AAPL, MSFT, GOOGL)
+
+**Cryptocurrencies**:
+- BTC (Bitcoin)
+- ETH (Ethereum)
+- BNB (Binance Coin)
+- SOL (Solana)
+- ADA (Cardano)
+- XRP (Ripple)
+- DOT (Polkadot)
+- DOGE (Dogecoin)
+- AVAX (Avalanche)
+- MATIC (Polygon)
+
+To add more cryptocurrencies, update the `CRYPTO_SYMBOL_MAP` in `src/lib/services/price-fetcher.ts`.
 
 ## Project Structure
 

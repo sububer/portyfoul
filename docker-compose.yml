@@ -34,6 +34,9 @@ services:
       POSTGRES_DB: portyfoul
       POSTGRES_USER: portyfoul
       POSTGRES_PASSWORD: portyfoul
+      # Finnhub API configuration (read from host environment or .env file)
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY}
+      PRICE_UPDATE_INTERVAL_MINUTES: ${PRICE_UPDATE_INTERVAL_MINUTES:-15}
     ports:
       - "3000:3000"
     depends_on:
