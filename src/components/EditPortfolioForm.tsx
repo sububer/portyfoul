@@ -43,52 +43,81 @@ export default function EditPortfolioForm({ portfolio, onSubmit, onCancel }: Edi
 
   const [holdings, setHoldings] = useState<EditableHolding[]>(initialHoldings);
   const [showAssetForm, setShowAssetForm] = useState(false);
+  const [isLoadingAsset, setIsLoadingAsset] = useState(false);
+  const [assetError, setAssetError] = useState<string | null>(null);
 
   // New asset form state
-  const [assetName, setAssetName] = useState('');
   const [assetSymbol, setAssetSymbol] = useState('');
   const [assetType, setAssetType] = useState<AssetType>('stock');
   const [assetQuantity, setAssetQuantity] = useState('');
-  const [assetPrice, setAssetPrice] = useState('');
 
-  const handleAddAsset = (e: React.FormEvent) => {
+  const handleAddAsset = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!assetName || !assetSymbol || !assetQuantity || !assetPrice) return;
+    if (!assetSymbol || !assetQuantity) return;
 
     const symbol = assetSymbol.toUpperCase();
+    const quantity = parseFloat(assetQuantity);
 
-    // Check if asset already exists in holdings
-    const existingIndex = holdings.findIndex(h => h.assetSymbol === symbol);
-    if (existingIndex >= 0) {
-      // Update existing holding
-      const updated = [...holdings];
-      updated[existingIndex] = {
-        ...updated[existingIndex],
-        quantity: updated[existingIndex].quantity + parseFloat(assetQuantity),
-        isModified: true,
-      };
-      setHoldings(updated);
-    } else {
-      // Add new holding
-      const newHolding: EditableHolding = {
-        assetSymbol: symbol,
-        assetName: assetName,
-        assetType: assetType,
-        quantity: parseFloat(assetQuantity),
-        currentPrice: parseFloat(assetPrice),
-        isExisting: false,
-        isModified: false,
-      };
-      setHoldings([...holdings, newHolding]);
+    if (quantity <= 0) {
+      setAssetError('Quantity must be greater than 0');
+      return;
     }
 
-    // Reset form
-    setAssetName('');
-    setAssetSymbol('');
-    setAssetQuantity('');
-    setAssetPrice('');
-    setShowAssetForm(false);
+    setIsLoadingAsset(true);
+    setAssetError(null);
+
+    try {
+      // Check if asset already exists in holdings
+      const existingIndex = holdings.findIndex(h => h.assetSymbol === symbol);
+      if (existingIndex >= 0) {
+        // Update existing holding
+        const updated = [...holdings];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          quantity: updated[existingIndex].quantity + quantity,
+          isModified: true,
+        };
+        setHoldings(updated);
+      } else {
+        // Fetch asset details (name and price) from external API
+        const response = await fetch('/api/assets/fetch-details', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol, type: assetType }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch asset details');
+        }
+
+        const result = await response.json();
+        const assetDetails = result.data;
+
+        // Add new holding with fetched details
+        const newHolding: EditableHolding = {
+          assetSymbol: symbol,
+          assetName: assetDetails.name,
+          assetType: assetType,
+          quantity: quantity,
+          currentPrice: assetDetails.price,
+          isExisting: false,
+          isModified: false,
+        };
+        setHoldings([...holdings, newHolding]);
+      }
+
+      // Reset form
+      setAssetSymbol('');
+      setAssetQuantity('');
+      setShowAssetForm(false);
+    } catch (error) {
+      console.error('Error adding asset:', error);
+      setAssetError(error instanceof Error ? error.message : 'Failed to add asset');
+    } finally {
+      setIsLoadingAsset(false);
+    }
   };
 
   const handleUpdateQuantity = (symbol: string, newQuantity: string) => {
@@ -200,6 +229,7 @@ export default function EditPortfolioForm({ portfolio, onSubmit, onCancel }: Edi
                     id="assetType"
                     value={assetType}
                     onChange={(e) => setAssetType(e.target.value as AssetType)}
+                    disabled={isLoadingAsset}
                   >
                     <option value="stock">Stock</option>
                     <option value="crypto">Crypto</option>
@@ -214,22 +244,10 @@ export default function EditPortfolioForm({ portfolio, onSubmit, onCancel }: Edi
                     value={assetSymbol}
                     onChange={(e) => setAssetSymbol(e.target.value)}
                     placeholder="AAPL, BTC"
+                    disabled={isLoadingAsset}
                   />
                 </div>
-              </div>
 
-              <div className="form-group">
-                <label htmlFor="assetName">Asset Name *</label>
-                <input
-                  type="text"
-                  id="assetName"
-                  value={assetName}
-                  onChange={(e) => setAssetName(e.target.value)}
-                  placeholder="Apple Inc., Bitcoin"
-                />
-              </div>
-
-              <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="assetQuantity">Quantity *</label>
                   <input
@@ -240,29 +258,24 @@ export default function EditPortfolioForm({ portfolio, onSubmit, onCancel }: Edi
                     placeholder="10"
                     step="0.0001"
                     min="0"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="assetPrice">Current Price *</label>
-                  <input
-                    type="number"
-                    id="assetPrice"
-                    value={assetPrice}
-                    onChange={(e) => setAssetPrice(e.target.value)}
-                    placeholder="178.50"
-                    step="0.01"
-                    min="0"
+                    disabled={isLoadingAsset}
                   />
                 </div>
               </div>
+
+              {assetError && (
+                <div className="error-message" style={{ color: 'red', marginBottom: '10px' }}>
+                  {assetError}
+                </div>
+              )}
 
               <button
                 type="button"
                 className="btn btn-primary"
                 onClick={handleAddAsset}
+                disabled={isLoadingAsset}
               >
-                Add Holding
+                {isLoadingAsset ? 'Fetching details...' : 'Add Holding'}
               </button>
             </div>
           )}
