@@ -162,3 +162,73 @@ export async function fetchMultipleAssetPrices(
 
   return { successful, failed };
 }
+
+/**
+ * Interface for asset details including name and price
+ */
+export interface AssetDetails {
+  symbol: string;
+  name: string;
+  price: number;
+  type: 'stock' | 'crypto';
+}
+
+/**
+ * Fetches detailed information about an asset including name and price
+ * For crypto: fetches from CoinGecko API
+ * For stocks: fetches price from Finnhub (name must be provided separately for stocks)
+ */
+export async function fetchAssetDetails(symbol: string, type: 'stock' | 'crypto'): Promise<AssetDetails> {
+  try {
+    if (type === 'crypto') {
+      // For crypto, we can get both name and price from CoinGecko
+      const coinGeckoId = CRYPTO_SYMBOL_TO_COINGECKO_ID[symbol];
+
+      if (!coinGeckoId) {
+        throw new Error(`Unsupported crypto symbol: ${symbol}. Add mapping in CRYPTO_SYMBOL_TO_COINGECKO_ID.`);
+      }
+
+      // Fetch both price and detailed info from CoinGecko
+      const url = new URL(`${COINGECKO_BASE_URL}/coins/${coinGeckoId}`);
+      url.searchParams.append('localization', 'false');
+      url.searchParams.append('tickers', 'false');
+      url.searchParams.append('market_data', 'true');
+      url.searchParams.append('community_data', 'false');
+      url.searchParams.append('developer_data', 'false');
+
+      if (config.coinGecko.apiKey) {
+        url.searchParams.append('x_cg_demo_api_key', config.coinGecko.apiKey);
+      }
+
+      const response = await fetch(url.toString());
+
+      if (!response.ok) {
+        throw new Error(`CoinGecko API error for ${symbol}: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      return {
+        symbol,
+        name: data.name,
+        price: data.market_data.current_price.usd,
+        type: 'crypto',
+      };
+    } else {
+      // For stocks, fetch price from Finnhub
+      // Note: Finnhub doesn't provide company names in the quote endpoint
+      // We'll use the symbol as the name for now, or enhance this later
+      const price = await fetchStockPrice(symbol);
+
+      return {
+        symbol,
+        name: symbol, // Use symbol as name for stocks (can be enhanced later)
+        price,
+        type: 'stock',
+      };
+    }
+  } catch (error) {
+    console.error(`Error fetching details for ${symbol} (${type}):`, error);
+    throw error;
+  }
+}
