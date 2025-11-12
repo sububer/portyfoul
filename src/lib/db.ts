@@ -47,6 +47,19 @@ export async function getClient(): Promise<PoolClient> {
   return await pool.connect();
 }
 
+/**
+ * Execute a query and return the number of affected rows
+ * Useful for DELETE, UPDATE operations where you need to know how many rows were affected
+ */
+export async function execute(
+  text: string,
+  params?: any[]
+): Promise<number> {
+  const pool = getPool();
+  const result = await pool.query(text, params);
+  return result.rowCount ?? 0;
+}
+
 // For graceful shutdown
 export async function closePool(): Promise<void> {
   if (pool) {

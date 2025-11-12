@@ -91,6 +91,59 @@ export const portfolioStore = {
     return enriched;
   },
 
+  async getAllByUserId(userId: string): Promise<PortfolioWithValues[]> {
+    // Get portfolios for specific user
+    const portfolioRows = await query<PortfolioRow>(`
+      SELECT id, name, description, user_id, created_at, updated_at
+      FROM portfolios
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+    `, [userId]);
+
+    if (portfolioRows.length === 0) {
+      return [];
+    }
+
+    // Get portfolio IDs
+    const portfolioIds = portfolioRows.map(row => row.id);
+
+    // Get holdings for these portfolios
+    const holdingRows = await query<HoldingRow>(`
+      SELECT portfolio_id, asset_symbol, quantity
+      FROM holdings
+      WHERE portfolio_id = ANY($1::uuid[])
+    `, [portfolioIds]);
+
+    // Group holdings by portfolio
+    const holdingsByPortfolio = new Map<string, Holding[]>();
+    for (const row of holdingRows) {
+      const holdings = holdingsByPortfolio.get(row.portfolio_id) || [];
+      holdings.push({
+        assetSymbol: row.asset_symbol,
+        quantity: parseFloat(row.quantity),
+      });
+      holdingsByPortfolio.set(row.portfolio_id, holdings);
+    }
+
+    // Build portfolios with holdings
+    const portfolios: Portfolio[] = portfolioRows.map(row => ({
+      id: row.id,
+      name: row.name,
+      description: row.description || undefined,
+      holdings: holdingsByPortfolio.get(row.id) || [],
+      userId: row.user_id || undefined,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    }));
+
+    // Enrich with values
+    const enriched = await Promise.all(
+      portfolios.map(p => enrichPortfolioWithValues(p))
+    );
+
+    return enriched;
+  },
+
   async getById(id: string): Promise<PortfolioWithValues | undefined> {
     const row = await queryOne<PortfolioRow>(`
       SELECT id, name, description, user_id, created_at, updated_at

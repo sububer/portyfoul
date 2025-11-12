@@ -15,6 +15,18 @@ COPY . .
 # Ensure public directory exists (optional for Next.js)
 RUN mkdir -p public
 
+# Set build-time environment variables
+# JWT_SECRET is required for production builds but can use a dummy value during build
+# The real JWT_SECRET will be provided at runtime via environment variables
+ARG JWT_SECRET=build-time-dummy-secret-replace-at-runtime
+ARG FINNHUB_API_KEY
+ARG COINGECKO_API_KEY
+
+ENV JWT_SECRET=${JWT_SECRET}
+ENV FINNHUB_API_KEY=${FINNHUB_API_KEY}
+ENV COINGECKO_API_KEY=${COINGECKO_API_KEY}
+ENV NODE_ENV=production
+
 # Build the application
 RUN npm run build
 
