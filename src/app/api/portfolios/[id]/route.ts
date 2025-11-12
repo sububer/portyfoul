@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { portfolioStore } from '@/lib/data/portfolios-db';
 import { UpdatePortfolioRequest, ApiResponse, PortfolioWithValues } from '@/types/api';
+import { requireAuth, handleAuthError } from '@/lib/middleware/auth';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -12,6 +13,9 @@ export async function GET(
   context: RouteContext
 ) {
   try {
+    // Require authentication
+    const user = requireAuth(request);
+
     const { id } = await context.params;
     const portfolio = await portfolioStore.getById(id);
 
@@ -22,10 +26,23 @@ export async function GET(
       );
     }
 
+    // Verify ownership
+    if (portfolio.userId !== user.userId) {
+      return NextResponse.json<ApiResponse<never>>(
+        { error: 'Forbidden: You do not have access to this portfolio' },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json<ApiResponse<PortfolioWithValues>>({
       data: portfolio,
     });
   } catch (error) {
+    // Handle authentication errors
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error);
+    }
+
     console.error('Error fetching portfolio:', error);
     return NextResponse.json<ApiResponse<never>>(
       { error: 'Failed to fetch portfolio' },
@@ -40,14 +57,26 @@ export async function PUT(
   context: RouteContext
 ) {
   try {
+    // Require authentication
+    const user = requireAuth(request);
+
     const { id } = await context.params;
     const body = await request.json() as UpdatePortfolioRequest;
 
-    // Check if portfolio exists
-    if (!(await portfolioStore.exists(id))) {
+    // Check if portfolio exists and get it to verify ownership
+    const portfolio = await portfolioStore.getById(id);
+    if (!portfolio) {
       return NextResponse.json<ApiResponse<never>>(
         { error: 'Portfolio not found' },
         { status: 404 }
+      );
+    }
+
+    // Verify ownership
+    if (portfolio.userId !== user.userId) {
+      return NextResponse.json<ApiResponse<never>>(
+        { error: 'Forbidden: You do not have access to this portfolio' },
+        { status: 403 }
       );
     }
 
@@ -72,6 +101,11 @@ export async function PUT(
       data: enriched,
     });
   } catch (error) {
+    // Handle authentication errors
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error);
+    }
+
     console.error('Error updating portfolio:', error);
     return NextResponse.json<ApiResponse<never>>(
       { error: 'Failed to update portfolio' },
@@ -86,13 +120,25 @@ export async function DELETE(
   context: RouteContext
 ) {
   try {
+    // Require authentication
+    const user = requireAuth(request);
+
     const { id } = await context.params;
 
-    // Check if portfolio exists
-    if (!(await portfolioStore.exists(id))) {
+    // Check if portfolio exists and get it to verify ownership
+    const portfolio = await portfolioStore.getById(id);
+    if (!portfolio) {
       return NextResponse.json<ApiResponse<never>>(
         { error: 'Portfolio not found' },
         { status: 404 }
+      );
+    }
+
+    // Verify ownership
+    if (portfolio.userId !== user.userId) {
+      return NextResponse.json<ApiResponse<never>>(
+        { error: 'Forbidden: You do not have access to this portfolio' },
+        { status: 403 }
       );
     }
 
@@ -103,6 +149,11 @@ export async function DELETE(
       data: { success: true },
     });
   } catch (error) {
+    // Handle authentication errors
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error);
+    }
+
     console.error('Error deleting portfolio:', error);
     return NextResponse.json<ApiResponse<never>>(
       { error: 'Failed to delete portfolio' },
