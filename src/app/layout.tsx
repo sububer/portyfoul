@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { AuthProvider } from '@/contexts/AuthContext'
+import NavigationHeader from '@/components/NavigationHeader'
 
 export const metadata: Metadata = {
   title: 'Portyfoul - Portfolio Manager',
@@ -13,7 +15,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          <NavigationHeader />
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   )
 }
