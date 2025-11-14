@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { PortfolioWithValues, CreatePortfolioRequest, ApiResponse } from '@/types/api';
 import PortfolioList from '@/components/PortfolioList';
 import CreatePortfolioForm from '@/components/CreatePortfolioForm';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
-export default function PortfoliosPage() {
+function PortfoliosContent() {
   const [portfolios, setPortfolios] = useState<PortfolioWithValues[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -115,5 +116,13 @@ export default function PortfoliosPage() {
         />
       )}
     </main>
+  );
+}
+
+export default function PortfoliosPage() {
+  return (
+    <ProtectedRoute>
+      <PortfoliosContent />
+    </ProtectedRoute>
   );
 }
