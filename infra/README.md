@@ -265,7 +265,7 @@ Approximate monthly costs for Phase 1 (VPC only):
    ```bash
    aws cloudformation describe-stack-events \
      --stack-name portyfoul-infra \
-     --region us-east-1 | head -50
+     --region us-east-2 | head -50
    ```
 
 2. Common issues:
