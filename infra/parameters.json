@@ -6,5 +6,21 @@
   {
     "ParameterKey": "ProjectName",
     "ParameterValue": "portyfoul"
+  },
+  {
+    "ParameterKey": "DBInstanceClass",
+    "ParameterValue": "db.t4g.micro"
+  },
+  {
+    "ParameterKey": "DBAllocatedStorage",
+    "ParameterValue": "20"
+  },
+  {
+    "ParameterKey": "DBBackupRetention",
+    "ParameterValue": "7"
+  },
+  {
+    "ParameterKey": "DBEngineVersion",
+    "ParameterValue": "17.2"
   }
 ]
