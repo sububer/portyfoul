@@ -24,6 +24,7 @@ export const config = {
 
   priceUpdate: {
     intervalMinutes: parseInt(process.env.PRICE_UPDATE_INTERVAL_MINUTES || '15', 10),
+    workerEnabled: process.env.PRICE_UPDATE_WORKER_ENABLED !== 'false', // Default true for backward compatibility
   },
 
   app: {

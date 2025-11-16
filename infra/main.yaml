@@ -415,11 +415,12 @@ Resources:
             "rules": [
               {
                 "rulePriority": 1,
-                "description": "Keep last 10 tagged images",
+                "description": "Remove untagged images after 7 days",
                 "selection": {
-                  "tagStatus": "tagged",
-                  "countType": "imageCountMoreThan",
-                  "countNumber": 10
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 7
                 },
                 "action": {
                   "type": "expire"
@@ -427,12 +428,11 @@ Resources:
               },
               {
                 "rulePriority": 2,
-                "description": "Remove untagged images after 7 days",
+                "description": "Keep last 10 images (any status)",
                 "selection": {
-                  "tagStatus": "untagged",
-                  "countType": "sinceImagePushed",
-                  "countUnit": "days",
-                  "countNumber": 7
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
                 },
                 "action": {
                   "type": "expire"
@@ -754,13 +754,13 @@ Resources:
           Secrets:
             # JWT Secret
             - Name: JWT_SECRET
-              ValueFrom: arn:aws:secretsmanager:us-east-2:946652103073:secret:portyfoul/dev/jwt-secret-GEcWhM
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/jwt-secret*'
             # Finnhub API Key
             - Name: FINNHUB_API_KEY
-              ValueFrom: arn:aws:secretsmanager:us-east-2:946652103073:secret:portyfoul/dev/finnhub-api-key-xoI5Do
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/finnhub-api-key*'
             # CoinGecko API Key (optional)
             - Name: COINGECKO_API_KEY
-              ValueFrom: arn:aws:secretsmanager:us-east-2:946652103073:secret:portyfoul/dev/coingecko-api-key-T1VPqU
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/coingecko-api-key*'
             # Database credentials
             - Name: POSTGRES_USER
               ValueFrom: !Sub '${DBSecret}:username::'
@@ -812,6 +812,102 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-${Environment}-web-service'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # ==========================================
+  # ECS Task Definition and Service (Worker)
+  # ==========================================
+
+  # Worker Task Definition
+  WorkerTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${ProjectName}-${Environment}-worker'
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: worker
+          Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECRRepository}:latest'
+          Essential: true
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: PRICE_UPDATE_WORKER_ENABLED
+              Value: 'true'
+            - Name: PRICE_UPDATE_INTERVAL_MINUTES
+              Value: '15'
+            - Name: POSTGRES_HOST
+              Value: !GetAtt DBInstance.Endpoint.Address
+            - Name: POSTGRES_PORT
+              Value: '5432'
+            - Name: POSTGRES_DB
+              Value: portyfoul
+          Secrets:
+            # JWT Secret
+            - Name: JWT_SECRET
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/jwt-secret*'
+            # Finnhub API Key
+            - Name: FINNHUB_API_KEY
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/finnhub-api-key*'
+            # CoinGecko API Key (optional)
+            - Name: COINGECKO_API_KEY
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/coingecko-api-key*'
+            # Database credentials
+            - Name: POSTGRES_USER
+              ValueFrom: !Sub '${DBSecret}:username::'
+            - Name: POSTGRES_PASSWORD
+              ValueFrom: !Sub '${DBSecret}:password::'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref WorkerLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: worker
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-worker-task'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Worker ECS Service
+  WorkerService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub '${ProjectName}-${Environment}-worker'
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref WorkerTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-worker-service'
         - Key: Environment
           Value: !Ref Environment
         - Key: Project
@@ -996,3 +1092,16 @@ Outputs:
     Value: !Ref WebTaskDefinition
     Export:
       Name: !Sub '${ProjectName}-${Environment}-WebTaskDefinitionArn'
+
+  # Worker Service Outputs
+  WorkerServiceName:
+    Description: ECS Worker Service name
+    Value: !GetAtt WorkerService.Name
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-WorkerServiceName'
+
+  WorkerTaskDefinitionArn:
+    Description: Worker Task Definition ARN
+    Value: !Ref WorkerTaskDefinition
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-WorkerTaskDefinitionArn'
