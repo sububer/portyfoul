@@ -209,6 +209,97 @@ The price fetcher currently supports:
 
 To add more cryptocurrencies, update the `CRYPTO_SYMBOL_TO_COINGECKO_ID` mapping in `src/lib/services/price-fetcher.ts`. Find CoinGecko coin IDs at https://www.coingecko.com/en/api/documentation
 
+## Deploying to AWS
+
+Portyfoul can be deployed to AWS using ECS Fargate with automated infrastructure provisioning and deployment.
+
+### Infrastructure Setup
+
+The infrastructure is managed via CloudFormation and includes:
+- VPC with public and private subnets
+- Application Load Balancer for web traffic
+- ECS Fargate cluster with separate web and worker services
+- RDS PostgreSQL database
+- ECR for container images
+- CloudWatch Logs for monitoring
+
+See [`infra/README.md`](infra/README.md) for detailed infrastructure documentation.
+
+### Quick Deployment
+
+1. **Install Python dependencies** (first time only):
+   ```bash
+   pip3 install -r requirements.txt
+   ```
+
+2. **Configure API keys** (required for price updates):
+
+   The application requires a Finnhub API key for stock prices. Get your free API key:
+   - Sign up at https://finnhub.io/register
+   - Update the secret:
+     ```bash
+     ./scripts/create-secrets.sh --update finnhub --region us-east-2 --env dev
+     ```
+
+   Optionally, add a CoinGecko API key for higher crypto price rate limits:
+   - Get at https://www.coingecko.com/en/api (optional - free tier works without)
+   - Update the secret:
+     ```bash
+     ./scripts/create-secrets.sh --update coingecko --region us-east-2 --env dev
+     ```
+
+3. **Deploy the application**:
+   ```bash
+   ./scripts/deploy.py --region us-east-2
+   ```
+
+The deployment script will:
+- Build the Docker image
+- Push to Amazon ECR
+- Update ECS task definitions
+- Deploy to both web and worker services
+- Monitor deployment progress
+- Verify health checks
+- Rollback automatically on failure
+
+### Deployment Options
+
+```bash
+# Full deployment (both web and worker services)
+./scripts/deploy.py
+
+# Preview changes without executing
+./scripts/deploy.py --dry-run
+
+# Build and push image only
+./scripts/deploy.py --build-only
+
+# Update services with existing image
+./scripts/deploy.py --update-services --tag abc12345
+
+# Deploy only web service
+./scripts/deploy.py --service web
+
+# Deploy only worker service
+./scripts/deploy.py --service worker
+```
+
+### Architecture
+
+The AWS deployment uses a separated architecture:
+
+- **Web Service**: 2+ containers handling HTTP requests via ALB (scalable)
+- **Worker Service**: 1 container running price update worker (singleton)
+- **Database**: RDS PostgreSQL in private subnet
+- **Networking**: Private subnets with NAT gateway for outbound traffic
+
+Worker service has `PRICE_UPDATE_WORKER_ENABLED=true`, while web service has it set to `false` to prevent duplicate price updates.
+
+For more details, see:
+- [`infra/README.md`](infra/README.md) - Complete infrastructure guide and secret management
+- [`infra_plan_spec.md`](infra_plan_spec.md) - Architecture decisions and implementation plan
+- [`scripts/create-secrets.sh`](scripts/create-secrets.sh) - Secret management helper script
+
 ## Project Structure
 
 ```
