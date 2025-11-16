@@ -21,7 +21,6 @@ Usage:
 import argparse
 import base64
 import boto3
-import json
 import subprocess
 import sys
 import time
