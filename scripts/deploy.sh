@@ -177,7 +177,9 @@ fi
 
 # Step 4: Authenticate with ECR
 print_info "Authenticating with ECR..."
-if aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ECR_URI" > /dev/null 2>&1; then
+# Extract the registry URL (without repository name) for docker login
+ECR_REGISTRY=$(echo "$ECR_URI" | cut -d'/' -f1)
+if aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY" > /dev/null 2>&1; then
     print_success "Successfully authenticated with ECR"
 else
     print_error "ECR authentication failed"
