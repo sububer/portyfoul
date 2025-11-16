@@ -45,6 +45,22 @@ Parameters:
     Default: '17.2'
     Description: PostgreSQL engine version
 
+  # HTTPS Configuration Parameters
+  CertificateArn:
+    Type: String
+    Description: ARN of ACM certificate for HTTPS (required for production)
+    Default: ''
+
+  HostedZoneId:
+    Type: String
+    Description: Route 53 Hosted Zone ID for domain
+    Default: ''
+
+  DomainName:
+    Type: String
+    Description: Primary domain name (e.g., example.com)
+    Default: ''
+
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -60,6 +76,12 @@ Metadata:
           - DBAllocatedStorage
           - DBBackupRetention
           - DBEngineVersion
+      - Label:
+          default: 'HTTPS and Domain Configuration'
+        Parameters:
+          - CertificateArn
+          - HostedZoneId
+          - DomainName
     ParameterLabels:
       ProjectName:
         default: 'Project Name'
@@ -73,6 +95,22 @@ Metadata:
         default: 'Backup Retention (Days)'
       DBEngineVersion:
         default: 'PostgreSQL Version'
+      CertificateArn:
+        default: 'ACM Certificate ARN'
+      HostedZoneId:
+        default: 'Route 53 Hosted Zone ID'
+      DomainName:
+        default: 'Domain Name'
+
+Conditions:
+  # Condition to check if HTTPS should be enabled
+  HasCertificate: !Not [!Equals [!Ref CertificateArn, '']]
+  HasDomain: !Not [!Equals [!Ref DomainName, '']]
+  HasHostedZone: !Not [!Equals [!Ref HostedZoneId, '']]
+  EnableHTTPS: !And
+    - !Condition HasCertificate
+    - !Condition HasDomain
+    - !Condition HasHostedZone
 
 Resources:
   # ==========================================
@@ -711,8 +749,108 @@ Resources:
       Protocol: HTTP
       Port: 80
       DefaultActions:
+        - !If
+          - EnableHTTPS
+          # If HTTPS is enabled, redirect HTTP to HTTPS
+          - Type: redirect
+            RedirectConfig:
+              Protocol: HTTPS
+              Port: 443
+              StatusCode: HTTP_301
+          # Otherwise, forward to target group
+          - Type: forward
+            TargetGroupArn: !Ref WebTargetGroup
+
+  # HTTPS Listener (conditional - only created if certificate is provided)
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: EnableHTTPS
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Protocol: HTTPS
+      Port: 443
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref WebTargetGroup
+
+  # ==========================================
+  # Route 53 DNS Records (conditional)
+  # ==========================================
+
+  # A record for root domain (e.g., example.com)
+  RootDomainRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: EnableHTTPS
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+        EvaluateTargetHealth: true
+
+  # A record for wildcard subdomains (e.g., *.example.com)
+  WildcardDomainRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: EnableHTTPS
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub "*.${DomainName}"
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+        EvaluateTargetHealth: true
+
+  # ==========================================
+  # ALB Listener Rules for Domain Redirects
+  # ==========================================
+
+  # Redirect root domain to porty subdomain (canonical URL)
+  RootDomainRedirectRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: EnableHTTPS
+    Properties:
+      ListenerArn: !Ref HTTPSListener
+      Priority: 1
+      Conditions:
+        - Field: host-header
+          Values:
+            - !Ref DomainName
+      Actions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            Host: !Sub "porty.${DomainName}"
+            Path: "/#{path}"
+            Query: "#{query}"
+            StatusCode: HTTP_301
+
+  # Redirect www subdomain to porty subdomain (canonical URL)
+  WWWRedirectRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: EnableHTTPS
+    Properties:
+      ListenerArn: !Ref HTTPSListener
+      Priority: 2
+      Conditions:
+        - Field: host-header
+          Values:
+            - !Sub "www.${DomainName}"
+      Actions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            Host: !Sub "porty.${DomainName}"
+            Path: "/#{path}"
+            Query: "#{query}"
+            StatusCode: HTTP_301
 
   # ==========================================
   # ECS Task Definition and Service (Web)
@@ -754,13 +892,13 @@ Resources:
           Secrets:
             # JWT Secret
             - Name: JWT_SECRET
-              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/jwt-secret*'
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/jwt-secret-GEcWhM'
             # Finnhub API Key
             - Name: FINNHUB_API_KEY
-              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/finnhub-api-key*'
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/finnhub-api-key-xoI5Do'
             # CoinGecko API Key (optional)
             - Name: COINGECKO_API_KEY
-              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/coingecko-api-key*'
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/coingecko-api-key-T1VPqU'
             # Database credentials
             - Name: POSTGRES_USER
               ValueFrom: !Sub '${DBSecret}:username::'
@@ -783,7 +921,8 @@ Resources:
   # Web ECS Service
   WebService:
     Type: AWS::ECS::Service
-    DependsOn: HTTPListener
+    DependsOn:
+      - HTTPListener
     Properties:
       ServiceName: !Sub '${ProjectName}-${Environment}-web'
       Cluster: !Ref ECSCluster
@@ -856,13 +995,13 @@ Resources:
           Secrets:
             # JWT Secret
             - Name: JWT_SECRET
-              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/jwt-secret*'
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/jwt-secret-GEcWhM'
             # Finnhub API Key
             - Name: FINNHUB_API_KEY
-              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/finnhub-api-key*'
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/finnhub-api-key-xoI5Do'
             # CoinGecko API Key (optional)
             - Name: COINGECKO_API_KEY
-              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/coingecko-api-key*'
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/coingecko-api-key-T1VPqU'
             # Database credentials
             - Name: POSTGRES_USER
               ValueFrom: !Sub '${DBSecret}:username::'
@@ -1105,3 +1244,46 @@ Outputs:
     Value: !Ref WorkerTaskDefinition
     Export:
       Name: !Sub '${ProjectName}-${Environment}-WorkerTaskDefinitionArn'
+
+  # HTTPS and Domain Outputs
+  HTTPSURL:
+    Condition: EnableHTTPS
+    Description: Canonical HTTPS URL of the application
+    Value: !Sub "https://porty.${DomainName}"
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-HTTPSURL'
+
+  HTTPSListenerArn:
+    Condition: EnableHTTPS
+    Description: HTTPS Listener ARN
+    Value: !Ref HTTPSListener
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-HTTPSListenerArn'
+
+  CanonicalURL:
+    Condition: EnableHTTPS
+    Description: Canonical URL for the portfolio application
+    Value: !Sub "https://porty.${DomainName}"
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-CanonicalURL'
+
+  RedirectURLs:
+    Condition: EnableHTTPS
+    Description: URLs that redirect to canonical URL
+    Value: !Sub "https://${DomainName}, https://www.${DomainName}"
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-RedirectURLs'
+
+  DomainNameOutput:
+    Condition: EnableHTTPS
+    Description: Configured domain name
+    Value: !Ref DomainName
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-DomainName'
+
+  HostedZoneIdOutput:
+    Condition: EnableHTTPS
+    Description: Route 53 Hosted Zone ID
+    Value: !Ref HostedZoneId
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-HostedZoneId'
