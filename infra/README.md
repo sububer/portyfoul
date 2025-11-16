@@ -257,6 +257,287 @@ After updating secrets, you need to redeploy the ECS services to pick up the new
 
 **Note:** Secrets are injected into containers at startup, so running containers won't see updated values until they restart.
 
+## HTTPS and SSL/TLS Certificate Setup
+
+The infrastructure supports HTTPS via AWS Certificate Manager (ACM) and Route 53 DNS management. When configured, the Application Load Balancer will:
+- Serve HTTPS traffic on port 443
+- Automatically redirect HTTP (port 80) to HTTPS
+- Manage DNS records in Route 53 for your domain
+
+### Prerequisites
+
+- A registered domain name (can be registered with any provider, not just AWS)
+- Access to update DNS nameservers at your domain registrar
+- AWS CLI configured with appropriate permissions
+
+### HTTPS Configuration Parameters
+
+The CloudFormation template accepts three optional parameters for HTTPS:
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `CertificateArn` | ARN of ACM certificate | `arn:aws:acm:us-east-2:123456789012:certificate/abc...` |
+| `HostedZoneId` | Route 53 Hosted Zone ID | `Z00364892BW91A1O6XV4P` |
+| `DomainName` | Primary domain name | `example.com` |
+
+All three parameters must be provided to enable HTTPS. If any are empty (default), the stack runs in HTTP-only mode.
+
+### Quick Setup (Automated Helper Script)
+
+Use the helper script to walk through the setup process:
+
+```bash
+./scripts/setup-certificate.sh yourdomain.com
+```
+
+This interactive script will:
+1. Guide you through creating a Route 53 hosted zone
+2. Show you the nameservers to update at your registrar
+3. Request an ACM certificate with wildcard support
+4. Add DNS validation records
+5. Wait for certificate validation
+6. Provide the CloudFormation update command with all parameters filled in
+
+### Manual Setup Steps
+
+If you prefer manual setup:
+
+#### Step 1: Create Route 53 Hosted Zone
+
+```bash
+aws route53 create-hosted-zone \
+  --name yourdomain.com \
+  --caller-reference "yourdomain-$(date +%s)" \
+  --hosted-zone-config Comment="Hosted zone for yourdomain.com"
+```
+
+**Save the Hosted Zone ID and nameservers from the output!**
+
+#### Step 2: Update Nameservers at Registrar
+
+1. Log in to your domain registrar (GoDaddy, Namecheap, Google Domains, etc.)
+2. Find the DNS/Nameserver settings for your domain
+3. Replace the current nameservers with the 4 AWS nameservers from Step 1
+4. Wait for DNS propagation (5 minutes to 48 hours, typically < 1 hour)
+
+Verify propagation:
+```bash
+dig NS yourdomain.com +short
+```
+
+#### Step 3: Request ACM Certificate
+
+Request a certificate with both root domain and wildcard subdomain:
+
+```bash
+aws acm request-certificate \
+  --domain-name yourdomain.com \
+  --subject-alternative-names "*.yourdomain.com" \
+  --validation-method DNS \
+  --region us-east-2
+```
+
+**Save the Certificate ARN from the output!**
+
+#### Step 4: Add DNS Validation Records
+
+Get the validation CNAME record:
+
+```bash
+aws acm describe-certificate \
+  --certificate-arn YOUR_CERT_ARN \
+  --region us-east-2 \
+  --query 'Certificate.DomainValidationOptions[0].ResourceRecord'
+```
+
+Add the validation record to Route 53:
+
+```bash
+aws route53 change-resource-record-sets \
+  --hosted-zone-id YOUR_ZONE_ID \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "_validation_name_from_previous_command",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "_validation_value_from_previous_command"}]
+      }
+    }]
+  }'
+```
+
+#### Step 5: Wait for Certificate Validation
+
+Monitor certificate status:
+
+```bash
+aws acm describe-certificate \
+  --certificate-arn YOUR_CERT_ARN \
+  --region us-east-2 \
+  --query 'Certificate.Status' \
+  --output text
+```
+
+Wait until status is `ISSUED` (typically 5-30 minutes).
+
+#### Step 6: Update CloudFormation Stack
+
+Update the stack with HTTPS parameters:
+
+```bash
+aws cloudformation update-stack \
+  --stack-name portyfoul-dev \
+  --template-body file://infra/main.yaml \
+  --parameters \
+    ParameterKey=CertificateArn,ParameterValue=YOUR_CERT_ARN \
+    ParameterKey=HostedZoneId,ParameterValue=YOUR_ZONE_ID \
+    ParameterKey=DomainName,ParameterValue=yourdomain.com \
+    ParameterKey=Environment,UsePreviousValue=true \
+    ParameterKey=ProjectName,UsePreviousValue=true \
+    ParameterKey=DBInstanceClass,UsePreviousValue=true \
+    ParameterKey=DBAllocatedStorage,UsePreviousValue=true \
+    ParameterKey=DBBackupRetention,UsePreviousValue=true \
+    ParameterKey=DBEngineVersion,UsePreviousValue=true \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region us-east-2
+```
+
+Wait for stack update:
+
+```bash
+aws cloudformation wait stack-update-complete \
+  --stack-name portyfoul-dev \
+  --region us-east-2
+```
+
+#### Step 7: Verify HTTPS
+
+Test your HTTPS setup:
+
+```bash
+# Test canonical URL (should serve application)
+curl -I https://porty.yourdomain.com
+
+# Test root domain redirect
+curl -I https://yourdomain.com
+# Should return: HTTP/2 301, Location: https://porty.yourdomain.com
+
+# Test www redirect
+curl -I https://www.yourdomain.com
+# Should return: HTTP/2 301, Location: https://porty.yourdomain.com
+
+# Verify HTTP to HTTPS redirect
+curl -I http://porty.yourdomain.com
+# Should return: HTTP/1.1 301, Location: https://porty.yourdomain.com
+
+# Test path preservation
+curl -I https://yourdomain.com/test/path?param=value
+# Should redirect to: https://porty.yourdomain.com/test/path?param=value
+```
+
+### Certificate Details
+
+The ACM certificate is configured with:
+- **Primary Domain**: `yourdomain.com` (root domain)
+- **Subject Alternative Name**: `*.yourdomain.com` (wildcard for all subdomains)
+- **Coverage**: Supports current and future subdomains without reprovisioning
+- **Renewal**: Automatically managed by AWS (no manual renewal needed)
+- **Cost**: Free (ACM certificates are free for use with AWS services)
+- **SSL Policy**: `ELBSecurityPolicy-TLS13-1-2-2021-06` (TLS 1.2 and 1.3)
+
+### DNS Records Created
+
+When HTTPS is enabled, CloudFormation automatically creates:
+
+1. **Root Domain A Record**: `yourdomain.com` → ALB
+   - Type: A (Alias)
+   - Target: Application Load Balancer DNS name
+   - Health check: Enabled
+
+2. **Wildcard A Record**: `*.yourdomain.com` → ALB
+   - Type: A (Alias)
+   - Target: Application Load Balancer DNS name
+   - Health check: Enabled
+
+This configuration allows access via:
+- `https://porty.yourdomain.com` (canonical URL - serves application)
+- `https://yourdomain.com` (redirects to canonical URL)
+- `https://www.yourdomain.com` (redirects to canonical URL)
+- `https://any-other-subdomain.yourdomain.com` (covered by wildcard)
+
+### Domain Redirect Configuration
+
+The infrastructure is configured with `porty.yourdomain.com` as the canonical URL:
+
+**Canonical URL (serves application):**
+- `https://porty.yourdomain.com` → Application (HTTP/2 200)
+
+**Redirected URLs (301 permanent redirect):**
+- `https://yourdomain.com` → `https://porty.yourdomain.com`
+- `https://www.yourdomain.com` → `https://porty.yourdomain.com`
+
+**Redirect Features:**
+- Paths and query strings are preserved (e.g., `/path?param=value`)
+- SEO-friendly 301 permanent redirects
+- Future flexibility to host different content on root domain
+
+### HTTP to HTTPS Redirect
+
+When HTTPS is enabled:
+- All HTTP (port 80) traffic is automatically redirected to HTTPS (port 443)
+- Redirect type: 301 Permanent Redirect
+- Browser will cache the redirect
+- Example: `http://porty.yourdomain.com` → `https://porty.yourdomain.com`
+
+When HTTPS is disabled:
+- HTTP (port 80) traffic is forwarded directly to the application
+- No HTTPS listener is created
+
+### Troubleshooting HTTPS
+
+**Certificate validation stuck at PENDING_VALIDATION:**
+- Verify DNS validation CNAME record exists in Route 53
+- Check record name and value match exactly (including trailing dots)
+- Wait up to 30 minutes for ACM to detect the record
+
+**Stack update fails with certificate error:**
+- Ensure certificate is in `ISSUED` status before updating stack
+- Verify certificate is in the same region as the ALB (us-east-2)
+- Check certificate ARN is correct
+
+**Domain not resolving:**
+- Verify nameservers are updated at registrar
+- Check DNS propagation: `dig NS yourdomain.com +short`
+- Wait up to 48 hours for full global DNS propagation
+
+**HTTPS connection fails:**
+- Verify security group allows inbound port 443 (already configured)
+- Check ALB listener is created: `aws elbv2 describe-listeners --load-balancer-arn YOUR_ALB_ARN`
+- Verify certificate is attached to listener
+
+**HTTP not redirecting to HTTPS:**
+- Confirm all three HTTPS parameters are provided in stack
+- Check HTTP listener default action shows redirect (not forward)
+- Clear browser cache and test in incognito mode
+
+### Cost Impact
+
+Adding HTTPS has minimal cost impact:
+
+- **ACM Certificate**: $0/month (free)
+- **Route 53 Hosted Zone**: $0.50/month
+- **Route 53 Queries**: ~$0.40/million queries (~$0.50/month for typical usage)
+- **Total Additional Cost**: ~$1/month
+
+### Security Notes
+
+- The ALB terminates SSL/TLS, so traffic between ALB and ECS tasks is HTTP
+- ECS tasks are in private subnets, so this internal HTTP traffic is isolated
+- For end-to-end encryption, enable HTTPS on the Next.js application as well
+- Certificate auto-renewal is handled by ACM (no action needed)
+
 ### Secret Rotation
 
 **Automatic Rotation:** Not currently configured

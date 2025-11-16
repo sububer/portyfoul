@@ -591,8 +591,8 @@ def main():
 
     parser.add_argument('--region', default='us-east-2',
                         help='AWS region (default: us-east-2)')
-    parser.add_argument('--stack', default='portyfoul-infra',
-                        help='CloudFormation stack name (default: portyfoul-infra)')
+    parser.add_argument('--stack', default='portyfoul-dev',
+                        help='CloudFormation stack name (default: portyfoul-dev)')
     parser.add_argument('--service', choices=['web', 'worker'],
                         help='Deploy specific service only (default: both)')
     parser.add_argument('--tag', help='Docker image tag (default: git SHA)')
