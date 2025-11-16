@@ -418,7 +418,6 @@ Resources:
                 "description": "Keep last 10 tagged images",
                 "selection": {
                   "tagStatus": "tagged",
-                  "tagPrefixList": ["v", "latest"],
                   "countType": "imageCountMoreThan",
                   "countNumber": 10
                 },
