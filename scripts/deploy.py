@@ -25,7 +25,6 @@ import subprocess
 import sys
 import time
 from typing import Dict, List, Optional
-from datetime import datetime
 
 
 # Color codes for terminal output
