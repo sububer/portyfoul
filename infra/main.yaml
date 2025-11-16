@@ -310,7 +310,6 @@ Resources:
       VpcId: !Ref VPC
       SecurityGroupIngress:
         # Allow PostgreSQL access from VPC CIDR
-        # In Phase 4, we'll restrict this to ECS Security Group only
         - IpProtocol: tcp
           FromPort: 5432
           ToPort: 5432
