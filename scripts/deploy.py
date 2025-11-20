@@ -191,7 +191,7 @@ class PortyfoulDeployer:
         log_info("Building Docker image...")
         try:
             subprocess.run(
-                ['docker', 'build', '-t', f'portyfoul:{tag}', '-t', 'portyfoul:latest', '.'],
+                ['docker', 'build', '--platform', 'linux/arm64', '-t', f'portyfoul:{tag}', '-t', 'portyfoul:latest', '.'],
                 check=True
             )
             log_success(f"Docker image built: portyfoul:{tag}")
