@@ -225,6 +225,40 @@ The infrastructure is managed via CloudFormation and includes:
 
 See [`infra/README.md`](infra/README.md) for detailed infrastructure documentation.
 
+### CI/CD Pipeline
+
+The repository uses GitHub Actions for automated builds and deployments:
+
+#### Automatic Build on Merge
+When code is merged to `main`:
+- Docker image is automatically built
+- Image is pushed to Amazon ECR
+- Tagged with 8-character commit SHA (e.g., `94902b79`) and `latest`
+- **No deployment occurs** - existing services continue running
+
+This saves GitHub Actions minutes and gives you control over when deployments happen.
+
+#### Manual Deployment via GitHub Actions
+To deploy to AWS ECS:
+
+1. Go to **Actions** → **Deploy to AWS ECS** → **Run workflow**
+2. Select deployment options:
+   - **Service**: Choose `web`, `worker`, or `both` (default: both)
+   - **Image tag**: Specify a tag or leave empty to use latest commit
+3. Click **Run workflow**
+
+The workflow will:
+- Update ECS task definitions with the specified image
+- Deploy selected service(s) with rolling updates
+- Monitor deployment progress (~5 minutes)
+- Verify health checks automatically
+
+**Example deployment scenarios:**
+- Deploy latest code to both services: Select `both`, leave tag empty
+- Deploy only web service: Select `web`, leave tag empty
+- Rollback to previous version: Select service, enter previous tag (e.g., `abc12345`)
+- Deploy specific commit: Select service, enter 8-character SHA
+
 ### Quick Deployment
 
 1. **Install Python dependencies** (first time only):
