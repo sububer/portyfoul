@@ -4,19 +4,43 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to deploy'
+        required: true
+        type: choice
+        options:
+          - both
+          - web
+          - worker
+        default: both
+      image_tag:
+        description: 'Docker image tag to deploy (leave empty for latest commit SHA)'
+        required: false
+        type: string
 
 permissions:
   id-token: write  # Required for OIDC authentication
   contents: read   # Required for checkout
 
 jobs:
-  deploy:
+  build:
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
+    # Only run on push to main, not on manual workflow_dispatch
+    if: github.event_name == 'push'
+
+    outputs:
+      image_tag: ${{ steps.set-tag.outputs.tag }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set short SHA
+        id: set-tag
+        run: echo "tag=$(git rev-parse --short=8 HEAD)" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -36,12 +60,77 @@ jobs:
       - name: Install boto3
         run: pip install boto3
 
-      - name: Deploy to ECS
+      - name: Build and push Docker image
         run: |
           python scripts/deploy.py \
             --region ${{ secrets.AWS_REGION }} \
             --stack ${{ secrets.CLOUDFORMATION_STACK }} \
-            --tag ${{ github.sha }} \
+            --tag ${{ steps.set-tag.outputs.tag }} \
+            --build-only
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Image build summary
+        run: |
+          echo "✅ Docker image built and pushed successfully"
+          echo "📦 Image tag: ${{ steps.set-tag.outputs.tag }}"
+          echo "🚀 To deploy, go to Actions → Deploy to AWS ECS → Run workflow"
+
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    # Only run on manual workflow_dispatch
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine image tag
+        id: determine-tag
+        run: |
+          if [ -z "${{ inputs.image_tag }}" ]; then
+            TAG=$(git rev-parse --short=8 HEAD)
+            echo "Using current commit SHA: $TAG"
+          else
+            TAG="${{ inputs.image_tag }}"
+            echo "Using provided tag: $TAG"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install boto3
+        run: pip install boto3
+
+      - name: Deploy to ECS
+        run: |
+          SERVICE_FLAG=""
+          if [ "${{ inputs.service }}" != "both" ]; then
+            SERVICE_FLAG="--service ${{ inputs.service }}"
+          fi
+
+          python scripts/deploy.py \
+            --region ${{ secrets.AWS_REGION }} \
+            --stack ${{ secrets.CLOUDFORMATION_STACK }} \
+            --tag ${{ steps.determine-tag.outputs.tag }} \
+            --update-services \
+            $SERVICE_FLAG \
             --timeout 600
         env:
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Deployment summary
+        run: |
+          echo "✅ Deployment completed successfully"
+          echo "🎯 Service(s): ${{ inputs.service }}"
+          echo "📦 Image tag: ${{ steps.determine-tag.outputs.tag }}"
