@@ -27,6 +27,9 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
+# Install curl for health checks
+RUN apk add --no-cache curl
+
 # Set NODE_ENV to production
 ENV NODE_ENV=production
 
