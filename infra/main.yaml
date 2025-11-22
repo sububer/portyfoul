@@ -722,13 +722,13 @@ Resources:
       VpcId: !Ref VPC
       HealthCheckEnabled: true
       HealthCheckProtocol: HTTP
-      HealthCheckPath: /
+      HealthCheckPath: /api/health
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
       Matcher:
-        HttpCode: 200-299
+        HttpCode: 200
       # Deregistration delay (time to drain connections)
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
