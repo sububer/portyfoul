@@ -910,6 +910,14 @@ Resources:
               awslogs-group: !Ref WebLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: web
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - curl -f http://localhost:3000/api/health || exit 1
+            Interval: 10
+            Timeout: 3
+            Retries: 3
+            StartPeriod: 30
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-${Environment}-web-task'
@@ -947,7 +955,7 @@ Resources:
         - ContainerName: web
           ContainerPort: 3000
           TargetGroupArn: !Ref WebTargetGroup
-      HealthCheckGracePeriodSeconds: 60
+      HealthCheckGracePeriodSeconds: 45
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-${Environment}-web-service'
@@ -1013,6 +1021,14 @@ Resources:
               awslogs-group: !Ref WorkerLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: worker
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - curl -f http://localhost:3000/api/health || exit 1
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-${Environment}-worker-task'
