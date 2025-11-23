@@ -1,24 +1,21 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ResetPasswordForm from '@/components/ResetPasswordForm';
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
-  const [token, setToken] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const { token, error } = useMemo(() => {
     const tokenParam = searchParams.get('token');
 
     if (!tokenParam) {
-      setError('No reset token provided');
-      return;
+      return { token: null, error: 'No reset token provided' };
     }
 
-    setToken(tokenParam);
+    return { token: tokenParam, error: null };
   }, [searchParams]);
 
   return (

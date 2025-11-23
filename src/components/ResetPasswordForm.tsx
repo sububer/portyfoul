@@ -116,7 +116,7 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     <div style={{ maxWidth: '400px', margin: '0 auto' }}>
       <h2 style={{ marginBottom: '1rem', color: '#1F2937' }}>Create New Password</h2>
       <p style={{ marginBottom: '1.5rem', color: '#6B7280', fontSize: '0.875rem' }}>
-        Enter a new password for your account. Make sure it's strong and unique.
+        Enter a new password for your account. Make sure it&apos;s strong and unique.
       </p>
 
       <form onSubmit={handleSubmit}>
