@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ResetPasswordForm from '@/components/ResetPasswordForm';
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams();
 
   const { token, error } = useMemo(() => {
@@ -86,5 +86,39 @@ export default function ResetPasswordPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#F9FAFB',
+          padding: '1rem',
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '2rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            width: '100%',
+            maxWidth: '500px',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontSize: '2rem', marginBottom: '1rem', color: '#6B7280' }}>⏳</div>
+          <p style={{ color: '#6B7280' }}>Loading...</p>
+        </div>
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }
