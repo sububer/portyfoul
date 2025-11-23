@@ -23,6 +23,7 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [website, setWebsite] = useState(''); // Honeypot field
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{
     email?: string;
@@ -79,7 +80,7 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
     }
 
     try {
-      await register(email, username, password);
+      await register(email, username, password, website);
       onSuccess?.();
     } catch (err) {
       // Error is handled by AuthContext
@@ -210,6 +211,20 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
             </ul>
           </div>
         )}
+      </div>
+
+      {/* Honeypot field - hidden from humans, may be filled by bots */}
+      <div style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none' }} aria-hidden="true">
+        <label htmlFor="register-website">Website</label>
+        <input
+          id="register-website"
+          type="text"
+          name="website"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          tabIndex={-1}
+          autoComplete="off"
+        />
       </div>
 
       <div className="form-actions">

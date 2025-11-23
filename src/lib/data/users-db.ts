@@ -13,6 +13,9 @@ export interface User {
   email: string;
   username: string;
   passwordHash: string;
+  emailVerified: boolean;
+  verificationToken: string | null;
+  verificationTokenExpiresAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +36,7 @@ export interface SafeUser {
   id: string;
   email: string;
   username: string;
+  emailVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,6 +49,9 @@ interface UserRow {
   email: string;
   username: string;
   password_hash: string;
+  email_verified: boolean;
+  verification_token: string | null;
+  verification_token_expires_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -58,19 +65,23 @@ function rowToUser(row: UserRow): User {
     email: row.email,
     username: row.username,
     passwordHash: row.password_hash,
+    emailVerified: row.email_verified,
+    verificationToken: row.verification_token,
+    verificationTokenExpiresAt: row.verification_token_expires_at ? new Date(row.verification_token_expires_at) : null,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
 }
 
 /**
- * Converts a User model to SafeUser (removes password hash)
+ * Converts a User model to SafeUser (removes password hash and verification token)
  */
 export function toSafeUser(user: User): SafeUser {
   return {
     id: user.id,
     email: user.email,
     username: user.username,
+    emailVerified: user.emailVerified,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -88,7 +99,7 @@ export const userStore = {
       `
       INSERT INTO users (email, username, password_hash)
       VALUES ($1, $2, $3)
-      RETURNING id, email, username, password_hash, created_at, updated_at
+      RETURNING id, email, username, password_hash, email_verified, verification_token, verification_token_expires_at, created_at, updated_at
       `,
       [userData.email, userData.username, userData.passwordHash]
     );
@@ -106,7 +117,7 @@ export const userStore = {
   async getById(id: string): Promise<User | undefined> {
     const row = await queryOne<UserRow>(
       `
-      SELECT id, email, username, password_hash, created_at, updated_at
+      SELECT id, email, username, password_hash, email_verified, verification_token, verification_token_expires_at, created_at, updated_at
       FROM users
       WHERE id = $1
       `,
@@ -122,7 +133,7 @@ export const userStore = {
   async getByEmail(email: string): Promise<User | undefined> {
     const row = await queryOne<UserRow>(
       `
-      SELECT id, email, username, password_hash, created_at, updated_at
+      SELECT id, email, username, password_hash, email_verified, verification_token, verification_token_expires_at, created_at, updated_at
       FROM users
       WHERE email = $1
       `,
@@ -138,7 +149,7 @@ export const userStore = {
   async getByUsername(username: string): Promise<User | undefined> {
     const row = await queryOne<UserRow>(
       `
-      SELECT id, email, username, password_hash, created_at, updated_at
+      SELECT id, email, username, password_hash, email_verified, verification_token, verification_token_expires_at, created_at, updated_at
       FROM users
       WHERE username = $1
       `,
@@ -185,7 +196,7 @@ export const userStore = {
       UPDATE users
       SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
-      RETURNING id, email, username, password_hash, created_at, updated_at
+      RETURNING id, email, username, password_hash, email_verified, verification_token, verification_token_expires_at, created_at, updated_at
       `,
       [newPasswordHash, userId]
     );
@@ -202,7 +213,7 @@ export const userStore = {
       UPDATE users
       SET username = $1, updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
-      RETURNING id, email, username, password_hash, created_at, updated_at
+      RETURNING id, email, username, password_hash, email_verified, verification_token, verification_token_expires_at, created_at, updated_at
       `,
       [newUsername, userId]
     );
@@ -233,12 +244,65 @@ export const userStore = {
   async getAll(): Promise<SafeUser[]> {
     const rows = await query<UserRow>(
       `
-      SELECT id, email, username, password_hash, created_at, updated_at
+      SELECT id, email, username, password_hash, email_verified, verification_token, verification_token_expires_at, created_at, updated_at
       FROM users
       ORDER BY created_at DESC
       `
     );
 
     return rows.map(row => toSafeUser(rowToUser(row)));
+  },
+
+  /**
+   * Sets the verification token for a user
+   */
+  async setVerificationToken(userId: string, token: string, expiresAt: Date): Promise<User | undefined> {
+    const row = await queryOne<UserRow>(
+      `
+      UPDATE users
+      SET verification_token = $1, verification_token_expires_at = $2, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING id, email, username, password_hash, email_verified, verification_token, verification_token_expires_at, created_at, updated_at
+      `,
+      [token, expiresAt, userId]
+    );
+
+    return row ? rowToUser(row) : undefined;
+  },
+
+  /**
+   * Finds a user by verification token
+   */
+  async getByVerificationToken(token: string): Promise<User | undefined> {
+    const row = await queryOne<UserRow>(
+      `
+      SELECT id, email, username, password_hash, email_verified, verification_token, verification_token_expires_at, created_at, updated_at
+      FROM users
+      WHERE verification_token = $1
+      `,
+      [token]
+    );
+
+    return row ? rowToUser(row) : undefined;
+  },
+
+  /**
+   * Verifies a user's email using a verification token
+   * Returns the user if token is valid and not expired, undefined otherwise
+   */
+  async verifyEmail(token: string): Promise<User | undefined> {
+    const row = await queryOne<UserRow>(
+      `
+      UPDATE users
+      SET email_verified = TRUE, verification_token = NULL, verification_token_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+      WHERE verification_token = $1
+        AND verification_token_expires_at > CURRENT_TIMESTAMP
+        AND email_verified = FALSE
+      RETURNING id, email, username, password_hash, email_verified, verification_token, verification_token_expires_at, created_at, updated_at
+      `,
+      [token]
+    );
+
+    return row ? rowToUser(row) : undefined;
   },
 };

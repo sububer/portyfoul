@@ -6,6 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userStore, toSafeUser } from '@/lib/data/users-db';
 import { verifyPassword, generateToken } from '@/lib/auth';
+import { enforceRateLimit } from '@/lib/middleware/rate-limit';
+import { extractIpAddress, extractUserAgent } from '@/lib/utils/security';
+import { config } from '@/lib/config';
 
 interface LoginRequest {
   email: string;
@@ -14,8 +17,24 @@ interface LoginRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: 10 login attempts per 15 minutes per IP
+    const rateLimitResponse = enforceRateLimit(request, 'login', {
+      maxRequests: config.rateLimits.loginPer15Min,
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      message: 'Too many login attempts. Please try again in a few minutes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const body: LoginRequest = await request.json();
     const { email, password } = body;
+
+    // Log login attempt for security monitoring
+    const ipAddress = extractIpAddress(request);
+    const userAgent = extractUserAgent(request);
+    console.log(`Login attempt for ${email} from IP ${ipAddress}, User-Agent: ${userAgent}`);
 
     // Validate input presence
     if (!email || !password) {

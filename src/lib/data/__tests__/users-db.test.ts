@@ -23,6 +23,9 @@ describe('userStore', () => {
     email: 'test@example.com',
     username: 'testuser',
     password_hash: '$2b$10$hashedpassword',
+    email_verified: true,
+    verification_token: null,
+    verification_token_expires_at: null,
     created_at: new Date('2024-01-01T00:00:00Z'),
     updated_at: new Date('2024-01-01T00:00:00Z'),
   };
@@ -32,6 +35,9 @@ describe('userStore', () => {
     email: mockUserRow.email,
     username: mockUserRow.username,
     passwordHash: mockUserRow.password_hash,
+    emailVerified: mockUserRow.email_verified,
+    verificationToken: mockUserRow.verification_token,
+    verificationTokenExpiresAt: mockUserRow.verification_token_expires_at,
     createdAt: mockUserRow.created_at,
     updatedAt: mockUserRow.updated_at,
   };
@@ -319,6 +325,129 @@ describe('userStore', () => {
       expect(result).toEqual([]);
     });
   });
+
+  describe('setVerificationToken', () => {
+    it('should set verification token and expiry', async () => {
+      const token = 'verification-token-123';
+      const expiresAt = new Date('2024-01-02T00:00:00Z');
+      const updatedRow = {
+        ...mockUserRow,
+        verification_token: token,
+        verification_token_expires_at: expiresAt,
+        updated_at: new Date('2024-01-02T00:00:00Z'),
+      };
+      (db.queryOne as jest.Mock).mockResolvedValue(updatedRow);
+
+      const result = await userStore.setVerificationToken(mockUserRow.id, token, expiresAt);
+
+      expect(result).toBeTruthy();
+      expect(result?.verificationToken).toBe(token);
+      expect(result?.verificationTokenExpiresAt).toStrictEqual(expiresAt);
+      expect(db.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE users'),
+        [token, expiresAt, mockUserRow.id]
+      );
+    });
+
+    it('should return undefined if user not found', async () => {
+      (db.queryOne as jest.Mock).mockResolvedValue(null);
+
+      const result = await userStore.setVerificationToken(
+        'non-existent-id',
+        'token',
+        new Date()
+      );
+
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('getByVerificationToken', () => {
+    it('should find user by verification token', async () => {
+      const token = 'verification-token-123';
+      const rowWithToken = {
+        ...mockUserRow,
+        verification_token: token,
+        verification_token_expires_at: new Date('2025-01-01T00:00:00Z'),
+        email_verified: false,
+      };
+      (db.queryOne as jest.Mock).mockResolvedValue(rowWithToken);
+
+      const result = await userStore.getByVerificationToken(token);
+
+      expect(result).toBeTruthy();
+      expect(result?.verificationToken).toBe(token);
+      expect(db.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE verification_token = $1'),
+        [token]
+      );
+    });
+
+    it('should return undefined if token not found', async () => {
+      (db.queryOne as jest.Mock).mockResolvedValue(null);
+
+      const result = await userStore.getByVerificationToken('non-existent-token');
+
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('should verify email with valid token', async () => {
+      const token = 'verification-token-123';
+      const verifiedRow = {
+        ...mockUserRow,
+        email_verified: true,
+        verification_token: null,
+        verification_token_expires_at: null,
+        updated_at: new Date('2024-01-02T00:00:00Z'),
+      };
+      (db.queryOne as jest.Mock).mockResolvedValue(verifiedRow);
+
+      const result = await userStore.verifyEmail(token);
+
+      expect(result).toBeTruthy();
+      expect(result?.emailVerified).toBe(true);
+      expect(result?.verificationToken).toBeNull();
+      expect(result?.verificationTokenExpiresAt).toBeNull();
+      expect(db.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE users'),
+        [token]
+      );
+      expect(db.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('email_verified = TRUE'),
+        [token]
+      );
+      expect(db.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('verification_token_expires_at > CURRENT_TIMESTAMP'),
+        [token]
+      );
+    });
+
+    it('should return undefined if token is expired', async () => {
+      (db.queryOne as jest.Mock).mockResolvedValue(null);
+
+      const result = await userStore.verifyEmail('expired-token');
+
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined if token is invalid', async () => {
+      (db.queryOne as jest.Mock).mockResolvedValue(null);
+
+      const result = await userStore.verifyEmail('invalid-token');
+
+      expect(result).toBeUndefined();
+    });
+
+    it('should not verify already verified emails', async () => {
+      (db.queryOne as jest.Mock).mockResolvedValue(null);
+
+      const result = await userStore.verifyEmail('token-for-verified-email');
+
+      expect(result).toBeUndefined();
+    });
+  });
 });
 
 describe('toSafeUser', () => {
@@ -328,6 +457,9 @@ describe('toSafeUser', () => {
       email: 'test@example.com',
       username: 'testuser',
       passwordHash: '$2b$10$hashedpassword',
+      emailVerified: true,
+      verificationToken: null,
+      verificationTokenExpiresAt: null,
       createdAt: new Date('2024-01-01'),
       updatedAt: new Date('2024-01-01'),
     };
@@ -335,10 +467,13 @@ describe('toSafeUser', () => {
     const safe = toSafeUser(user);
 
     expect(safe).not.toHaveProperty('passwordHash');
+    expect(safe).not.toHaveProperty('verificationToken');
+    expect(safe).not.toHaveProperty('verificationTokenExpiresAt');
     expect(safe).toEqual({
       id: user.id,
       email: user.email,
       username: user.username,
+      emailVerified: user.emailVerified,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     });

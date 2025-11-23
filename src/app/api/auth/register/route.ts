@@ -7,17 +7,64 @@ import { NextRequest, NextResponse } from 'next/server';
 import { userStore, toSafeUser } from '@/lib/data/users-db';
 import { hashPassword, generateToken } from '@/lib/auth';
 import { validatePassword, validateEmail, validateUsername } from '@/lib/validation';
+import { enforceRateLimit } from '@/lib/middleware/rate-limit';
+import { isHoneypotFilled, extractIpAddress, extractUserAgent, generateSecureToken } from '@/lib/utils/security';
+import { config } from '@/lib/config';
+import { sendEmail } from '@/lib/services/email-service';
+import { getVerificationEmail } from '@/lib/email-templates/verification-email';
 
 interface RegisterRequest {
   email: string;
   username: string;
   password: string;
+  website?: string; // Honeypot field
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: 5 registration attempts per 15 minutes per IP
+    const rateLimitResponse = enforceRateLimit(request, 'register', {
+      maxRequests: config.rateLimits.registrationPer15Min,
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      message: 'Too many registration attempts. Please try again in a few minutes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const body: RegisterRequest = await request.json();
-    const { email, username, password } = body;
+    const { email, username, password, website } = body;
+
+    // Honeypot check - if the hidden "website" field is filled, it's likely a bot
+    if (isHoneypotFilled(website)) {
+      const ip = extractIpAddress(request);
+      console.warn(`Bot detected in registration from IP ${ip} - honeypot filled`);
+
+      // Return success to avoid revealing bot detection
+      // Don't actually create the account
+      return NextResponse.json(
+        {
+          message: 'User registered successfully',
+          user: {
+            id: 'bot-detected',
+            email,
+            username,
+            emailVerified: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          token: 'bot-detected-token',
+        },
+        { status: 201 }
+      );
+    }
+
+    // Log registration attempt for security monitoring
+    const ipAddress = extractIpAddress(request);
+    const userAgent = extractUserAgent(request);
+    console.log(`Registration attempt from IP ${ipAddress}, User-Agent: ${userAgent}`);
+
 
     // Validate input presence
     if (!email || !username || !password) {
@@ -98,6 +145,28 @@ export async function POST(request: NextRequest) {
       username,
       passwordHash,
     });
+
+    // Generate email verification token
+    const verificationToken = generateSecureToken();
+    const verificationExpiresAt = new Date();
+    verificationExpiresAt.setHours(verificationExpiresAt.getHours() + config.tokens.verificationExpiryHours);
+
+    // Set verification token in database
+    await userStore.setVerificationToken(user.id, verificationToken, verificationExpiresAt);
+
+    // Send verification email (don't wait for it to complete)
+    sendEmail({
+      to: email,
+      ...getVerificationEmail({
+        username,
+        verificationToken,
+      }),
+    }).catch(error => {
+      console.error('Failed to send verification email:', error);
+      // Don't fail registration if email fails - user can resend later
+    });
+
+    console.log(`Verification email sent to ${email}`);
 
     // Generate JWT token
     const token = generateToken({
