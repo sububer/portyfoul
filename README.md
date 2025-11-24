@@ -67,6 +67,7 @@ docker-compose up
 ```
 
 The application will automatically:
+
 - Start the background price update worker
 - Fetch stock prices from Finnhub API
 - Fetch crypto prices from CoinGecko API (free tier, no key required)
@@ -161,6 +162,7 @@ npm run db:migrate
 ## Price Update Worker
 
 The application includes a background worker that automatically fetches and updates asset prices:
+
 - **Stock prices**: Fetched from Finnhub API (requires free API key)
 - **Crypto prices**: Fetched from CoinGecko API (free tier, no API key required)
 
@@ -191,6 +193,7 @@ The price fetcher currently supports:
 **Stocks**: Any stock symbol available on Finnhub (e.g., AAPL, MSFT, GOOGL)
 
 **Cryptocurrencies** (via CoinGecko):
+
 - BTC (Bitcoin)
 - ETH (Ethereum)
 - BNB (Binance Coin)
@@ -216,6 +219,7 @@ Portyfoul can be deployed to AWS using ECS Fargate with automated infrastructure
 ### Infrastructure Setup
 
 The infrastructure is managed via CloudFormation and includes:
+
 - VPC with public and private subnets
 - Application Load Balancer for web traffic
 - ECS Fargate cluster with separate web and worker services
@@ -230,7 +234,9 @@ See [`infra/README.md`](infra/README.md) for detailed infrastructure documentati
 The repository uses GitHub Actions for automated builds and deployments:
 
 #### Automatic Build on Merge
+
 When code is merged to `main`:
+
 - Docker image is automatically built
 - Image is pushed to Amazon ECR
 - Tagged with 8-character commit SHA (e.g., `94902b79`) and `latest`
@@ -239,6 +245,7 @@ When code is merged to `main`:
 This saves GitHub Actions minutes and gives you control over when deployments happen.
 
 #### Manual Deployment via GitHub Actions
+
 To deploy to AWS ECS:
 
 1. Go to **Actions** → **Deploy to AWS ECS** → **Run workflow**
@@ -248,12 +255,14 @@ To deploy to AWS ECS:
 3. Click **Run workflow**
 
 The workflow will:
+
 - Update ECS task definitions with the specified image
 - Deploy selected service(s) with rolling updates
 - Monitor deployment progress (~5 minutes)
 - Verify health checks automatically
 
 **Example deployment scenarios:**
+
 - Deploy latest code to both services: Select `both`, leave tag empty
 - Deploy only web service: Select `web`, leave tag empty
 - Rollback to previous version: Select service, enter previous tag (e.g., `abc12345`)
@@ -262,6 +271,7 @@ The workflow will:
 ### Quick Deployment
 
 1. **Install Python dependencies** (first time only):
+
    ```bash
    pip3 install -r requirements.txt
    ```
@@ -269,6 +279,7 @@ The workflow will:
 2. **Configure API keys** (required for price updates):
 
    The application requires a Finnhub API key for stock prices. Get your free API key:
+
    - Sign up at https://finnhub.io/register
    - Update the secret:
      ```bash
@@ -276,6 +287,7 @@ The workflow will:
      ```
 
    Optionally, add a CoinGecko API key for higher crypto price rate limits:
+
    - Get at https://www.coingecko.com/en/api (optional - free tier works without)
    - Update the secret:
      ```bash
@@ -288,6 +300,7 @@ The workflow will:
    ```
 
 The deployment script will:
+
 - Build the Docker image
 - Push to Amazon ECR
 - Update ECS task definitions
@@ -330,6 +343,7 @@ The AWS deployment uses a separated architecture:
 Worker service has `PRICE_UPDATE_WORKER_ENABLED=true`, while web service has it set to `false` to prevent duplicate price updates.
 
 For more details, see:
+
 - [`infra/README.md`](infra/README.md) - Complete infrastructure guide and secret management
 - [`infra_plan_spec.md`](infra_plan_spec.md) - Architecture decisions and implementation plan
 - [`scripts/create-secrets.sh`](scripts/create-secrets.sh) - Secret management helper script
