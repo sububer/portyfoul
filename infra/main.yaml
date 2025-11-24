@@ -61,6 +61,23 @@ Parameters:
     Description: Primary domain name (e.g., example.com)
     Default: ''
 
+  # Email Configuration Parameters
+  SESFromEmail:
+    Type: String
+    Description: Verified sender email address for AWS SES (e.g., support@example.com)
+    Default: 'support@halfzed.com'
+
+  SESRegion:
+    Type: String
+    Description: AWS region for SES service
+    Default: 'us-east-2'
+    AllowedValues:
+      - us-east-1
+      - us-east-2
+      - us-west-2
+      - eu-west-1
+      - eu-central-1
+
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -82,6 +99,11 @@ Metadata:
           - CertificateArn
           - HostedZoneId
           - DomainName
+      - Label:
+          default: 'Email Configuration'
+        Parameters:
+          - SESFromEmail
+          - SESRegion
     ParameterLabels:
       ProjectName:
         default: 'Project Name'
@@ -101,6 +123,10 @@ Metadata:
         default: 'Route 53 Hosted Zone ID'
       DomainName:
         default: 'Domain Name'
+      SESFromEmail:
+        default: 'SES From Email Address'
+      SESRegion:
+        default: 'SES AWS Region'
 
 Conditions:
   # Condition to check if HTTPS should be enabled
@@ -572,15 +598,21 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: 'sts:AssumeRole'
       Policies:
-        # Currently minimal permissions - can be extended if application needs AWS access
+        # Application permissions for AWS services
         - PolicyName: ApplicationPermissions
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              # Example: Allow CloudWatch metrics (if needed in future)
+              # Allow CloudWatch metrics
               - Effect: Allow
                 Action:
                   - 'cloudwatch:PutMetricData'
+                Resource: '*'
+              # Allow SES email sending for verification and password reset
+              - Effect: Allow
+                Action:
+                  - 'ses:SendEmail'
+                  - 'ses:SendRawEmail'
                 Resource: '*'
       Tags:
         - Key: Name
@@ -889,6 +921,30 @@ Resources:
               Value: '5432'
             - Name: POSTGRES_DB
               Value: portyfoul
+            # Email configuration
+            - Name: AWS_SES_REGION
+              Value: !Ref SESRegion
+            - Name: AWS_SES_FROM_EMAIL
+              Value: !Ref SESFromEmail
+            - Name: APP_URL
+              Value: !If
+                - EnableHTTPS
+                - !Sub "https://porty.${DomainName}"
+                - !Sub "http://${ApplicationLoadBalancer.DNSName}"
+            # Token expiry configuration
+            - Name: VERIFICATION_TOKEN_EXPIRY_HOURS
+              Value: '24'
+            - Name: PASSWORD_RESET_TOKEN_EXPIRY_MINUTES
+              Value: '60'
+            # Rate limiting configuration
+            - Name: RATE_LIMIT_REGISTRATION_PER_15MIN
+              Value: '5'
+            - Name: RATE_LIMIT_LOGIN_PER_15MIN
+              Value: '10'
+            - Name: RATE_LIMIT_PASSWORD_RESET_PER_15MIN
+              Value: '3'
+            - Name: RATE_LIMIT_RESEND_VERIFICATION_PER_15MIN
+              Value: '3'
           Secrets:
             # JWT Secret
             - Name: JWT_SECRET
@@ -1000,6 +1056,30 @@ Resources:
               Value: '5432'
             - Name: POSTGRES_DB
               Value: portyfoul
+            # Email configuration
+            - Name: AWS_SES_REGION
+              Value: !Ref SESRegion
+            - Name: AWS_SES_FROM_EMAIL
+              Value: !Ref SESFromEmail
+            - Name: APP_URL
+              Value: !If
+                - EnableHTTPS
+                - !Sub "https://porty.${DomainName}"
+                - !Sub "http://${ApplicationLoadBalancer.DNSName}"
+            # Token expiry configuration
+            - Name: VERIFICATION_TOKEN_EXPIRY_HOURS
+              Value: '24'
+            - Name: PASSWORD_RESET_TOKEN_EXPIRY_MINUTES
+              Value: '60'
+            # Rate limiting configuration
+            - Name: RATE_LIMIT_REGISTRATION_PER_15MIN
+              Value: '5'
+            - Name: RATE_LIMIT_LOGIN_PER_15MIN
+              Value: '10'
+            - Name: RATE_LIMIT_PASSWORD_RESET_PER_15MIN
+              Value: '3'
+            - Name: RATE_LIMIT_RESEND_VERIFICATION_PER_15MIN
+              Value: '3'
           Secrets:
             # JWT Secret
             - Name: JWT_SECRET
