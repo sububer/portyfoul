@@ -14,6 +14,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.936.0",
     "bcrypt": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
     "next": "^16.0.1",

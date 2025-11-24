@@ -29,12 +29,34 @@ export const config = {
 
   app: {
     nodeEnv: process.env.NODE_ENV || 'development',
+    url: process.env.APP_URL || 'http://localhost:3000',
   },
 
   auth: {
     jwtSecret: process.env.JWT_SECRET || '',
     jwtExpiresIn: '24h', // Token expires in 24 hours
     bcryptRounds: 10, // Number of salt rounds for bcrypt
+  },
+
+  email: {
+    sesRegion: process.env.AWS_SES_REGION || 'us-east-2',
+    fromAddress: process.env.AWS_SES_FROM_EMAIL || '',
+    awsCredentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+    },
+  },
+
+  tokens: {
+    verificationExpiryHours: parseInt(process.env.VERIFICATION_TOKEN_EXPIRY_HOURS || '24', 10),
+    passwordResetExpiryMinutes: parseInt(process.env.PASSWORD_RESET_TOKEN_EXPIRY_MINUTES || '60', 10),
+  },
+
+  rateLimits: {
+    registrationPer15Min: parseInt(process.env.RATE_LIMIT_REGISTRATION_PER_15MIN || '5', 10),
+    loginPer15Min: parseInt(process.env.RATE_LIMIT_LOGIN_PER_15MIN || '10', 10),
+    passwordResetPer15Min: parseInt(process.env.RATE_LIMIT_PASSWORD_RESET_PER_15MIN || '3', 10),
+    resendVerificationPer15Min: parseInt(process.env.RATE_LIMIT_RESEND_VERIFICATION_PER_15MIN || '3', 10),
   },
 } as const;
 

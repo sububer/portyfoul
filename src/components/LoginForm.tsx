@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface LoginFormProps {
@@ -113,6 +114,18 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
             {validationErrors.password}
           </span>
         )}
+        <div style={{ marginTop: '0.5rem', textAlign: 'right' }}>
+          <Link
+            href="/forgot-password"
+            style={{
+              fontSize: '0.875rem',
+              color: '#4F46E5',
+              textDecoration: 'none',
+            }}
+          >
+            Forgot password?
+          </Link>
+        </div>
       </div>
 
       <div className="form-actions">
