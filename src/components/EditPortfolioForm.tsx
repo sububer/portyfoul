@@ -210,13 +210,13 @@ export default function EditPortfolioForm({ portfolio, onSubmit, onCancel }: Edi
 
         <div className="assets-section">
           <div className="section-header">
-            <h3>Holdings ({holdings.filter(h => h.quantity > 0).length})</h3>
+            <h3>Assets ({holdings.filter(h => h.quantity > 0).length})</h3>
             <button
               type="button"
               className="btn btn-secondary btn-small"
               onClick={() => setShowAssetForm(!showAssetForm)}
             >
-              {showAssetForm ? 'Cancel' : 'Add Holding'}
+              {showAssetForm ? 'Cancel' : 'Add Asset'}
             </button>
           </div>
 
@@ -275,13 +275,13 @@ export default function EditPortfolioForm({ portfolio, onSubmit, onCancel }: Edi
                 onClick={handleAddAsset}
                 disabled={isLoadingAsset}
               >
-                {isLoadingAsset ? 'Fetching details...' : 'Add Holding'}
+                {isLoadingAsset ? 'Fetching details...' : 'Add Asset'}
               </button>
             </div>
           )}
 
           {holdings.length > 0 && (
-            <div className="holdings-edit-list">
+            <div className="assets-edit-list">
               <table>
                 <thead>
                   <tr>
@@ -327,7 +327,7 @@ export default function EditPortfolioForm({ portfolio, onSubmit, onCancel }: Edi
                 </tbody>
               </table>
               <p className="text-muted help-text">
-                Tip: Set quantity to 0 or click Remove to delete a holding when you save.
+                Tip: Set quantity to 0 or click Remove to delete an asset when you save.
               </p>
             </div>
           )}

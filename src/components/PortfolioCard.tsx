@@ -49,15 +49,15 @@ export default function PortfolioCard({ portfolio, onDelete }: PortfolioCardProp
           </span>
         </div>
         <div className="stat">
-          <span className="stat-label">Holdings</span>
+          <span className="stat-label">Assets</span>
           <span className="stat-value">{portfolio.holdings.length}</span>
         </div>
       </div>
 
       <div className="asset-list">
-        <h3>Holdings</h3>
+        <h3>Assets</h3>
         {portfolio.holdings.length === 0 ? (
-          <p className="text-muted">No holdings in this portfolio</p>
+          <p className="text-muted">No assets in this portfolio</p>
         ) : (
           <ul>
             {portfolio.holdings.map((holding) => (
