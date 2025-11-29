@@ -192,7 +192,7 @@ export default function PortfolioDetailPage({ params }: PageProps) {
                 </span>
               </div>
               <div className="stat">
-                <span className="stat-label">Holdings</span>
+                <span className="stat-label">Assets</span>
                 <span className="stat-value stat-value-large">
                   {portfolio.holdings.length}
                 </span>
@@ -206,11 +206,11 @@ export default function PortfolioDetailPage({ params }: PageProps) {
           </div>
 
           <div className="card">
-            <h2>Holdings</h2>
+            <h2>Assets</h2>
             {portfolio.holdings.length === 0 ? (
-              <p className="text-muted">No holdings in this portfolio</p>
+              <p className="text-muted">No assets in this portfolio</p>
             ) : (
-              <div className="holdings-table">
+              <div className="assets-table">
                 <table>
                   <thead>
                     <tr>
