@@ -85,7 +85,7 @@ docker-compose down -v
 
 #### Prerequisites
 
-- Node.js 22.x
+- Node.js 24.x
 - npm
 - PostgreSQL 17.x
 
