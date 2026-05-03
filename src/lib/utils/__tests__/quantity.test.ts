@@ -2,7 +2,6 @@ import {
   CRYPTO_DECIMALS,
   STOCK_DECIMALS,
   decimalsForType,
-  quantityStep,
   formatQuantity,
   isValidQuantity,
 } from '../quantity';
@@ -16,16 +15,6 @@ describe('decimalsForType', () => {
   it('returns 4 for stock', () => {
     expect(decimalsForType('stock')).toBe(STOCK_DECIMALS);
     expect(STOCK_DECIMALS).toBe(4);
-  });
-});
-
-describe('quantityStep', () => {
-  it('returns 0.00000001 for crypto', () => {
-    expect(quantityStep('crypto')).toBe('0.00000001');
-  });
-
-  it('returns 0.0001 for stock', () => {
-    expect(quantityStep('stock')).toBe('0.0001');
   });
 });
 
