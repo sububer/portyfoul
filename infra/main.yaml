@@ -42,7 +42,7 @@ Parameters:
 
   DBEngineVersion:
     Type: String
-    Default: '17.2'
+    Default: '17.9'
     Description: PostgreSQL engine version
 
   # HTTPS Configuration Parameters
