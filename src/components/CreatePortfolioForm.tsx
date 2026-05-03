@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { CreatePortfolioRequest, AssetType, Holding, CreateAssetRequest, ApiResponse, Asset } from '@/types/api';
-import { quantityStep, formatQuantity } from '@/lib/utils/quantity';
+import { formatQuantity } from '@/lib/utils/quantity';
 
 interface CreatePortfolioFormProps {
   onSubmit: (request: CreatePortfolioRequest) => void;
@@ -189,7 +189,7 @@ export default function CreatePortfolioForm({ onSubmit, onCancel }: CreatePortfo
                     value={assetQuantity}
                     onChange={(e) => setAssetQuantity(e.target.value)}
                     placeholder="10"
-                    step={quantityStep(assetType)}
+                    step="any"
                     min="0"
                   />
                 </div>

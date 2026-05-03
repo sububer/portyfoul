@@ -9,7 +9,6 @@ import {
   CreateAssetRequest,
   ApiResponse
 } from '@/types/api';
-import { quantityStep } from '@/lib/utils/quantity';
 
 interface EditPortfolioFormProps {
   portfolio: PortfolioWithValues;
@@ -257,7 +256,7 @@ export default function EditPortfolioForm({ portfolio, onSubmit, onCancel }: Edi
                     value={assetQuantity}
                     onChange={(e) => setAssetQuantity(e.target.value)}
                     placeholder="10"
-                    step={quantityStep(assetType)}
+                    step="any"
                     min="0"
                     disabled={isLoadingAsset}
                   />
@@ -309,7 +308,7 @@ export default function EditPortfolioForm({ portfolio, onSubmit, onCancel }: Edi
                           type="number"
                           value={holding.quantity}
                           onChange={(e) => handleUpdateQuantity(holding.assetSymbol, e.target.value)}
-                          step={quantityStep(holding.assetType)}
+                          step="any"
                           min="0"
                           className="quantity-input"
                         />
