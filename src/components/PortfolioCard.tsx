@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { PortfolioWithValues } from '@/types/api';
+import { formatQuantity } from '@/lib/utils/quantity';
 
 interface PortfolioCardProps {
   portfolio: PortfolioWithValues;
@@ -69,9 +70,9 @@ export default function PortfolioCard({ portfolio, onDelete }: PortfolioCardProp
                   <span className="asset-badge">{holding.asset.type}</span>
                 </div>
                 <div className="asset-details">
-                  <span>Quantity: {holding.quantity}</span>
+                  <span>Quantity: {formatQuantity(holding.quantity, holding.asset.type)}</span>
                   <span>
-                    {formatCurrency(holding.asset.currentPrice)} × {holding.quantity} ={' '}
+                    {formatCurrency(holding.asset.currentPrice)} × {formatQuantity(holding.quantity, holding.asset.type)} ={' '}
                     {formatCurrency(holding.totalValue)}
                   </span>
                 </div>

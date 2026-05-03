@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { portfolioStore } from '@/lib/data/portfolios-db';
 import { CreatePortfolioRequest, ApiResponse, PortfolioWithValues } from '@/types/api';
 import { requireAuth, handleAuthError } from '@/lib/middleware/auth';
+import { isValidQuantity } from '@/lib/utils/quantity';
 
 // GET /api/portfolios - List all portfolios for authenticated user
 export async function GET(request: NextRequest) {
@@ -44,11 +45,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const holdings = body.holdings || [];
+    for (const holding of holdings) {
+      if (!isValidQuantity(holding.quantity)) {
+        return NextResponse.json<ApiResponse<never>>(
+          { error: `Invalid quantity for ${holding.assetSymbol}: must be a positive number` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Create portfolio with authenticated user's ID
     const portfolio = await portfolioStore.create({
       name: body.name.trim(),
       description: body.description?.trim(),
-      holdings: body.holdings || [],
+      holdings,
       userId: user.userId,
     });
 

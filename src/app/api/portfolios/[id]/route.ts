@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { portfolioStore } from '@/lib/data/portfolios-db';
 import { UpdatePortfolioRequest, ApiResponse, PortfolioWithValues } from '@/types/api';
 import { requireAuth, handleAuthError } from '@/lib/middleware/auth';
+import { isValidQuantity } from '@/lib/utils/quantity';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -86,6 +87,17 @@ export async function PUT(
         { error: 'Portfolio name cannot be empty' },
         { status: 400 }
       );
+    }
+
+    if (body.holdings !== undefined) {
+      for (const holding of body.holdings) {
+        if (!isValidQuantity(holding.quantity)) {
+          return NextResponse.json<ApiResponse<never>>(
+            { error: `Invalid quantity for ${holding.assetSymbol}: must be a positive number` },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // Update portfolio

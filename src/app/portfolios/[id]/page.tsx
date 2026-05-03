@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PortfolioWithValues, ApiResponse, UpdatePortfolioRequest } from '@/types/api';
 import EditPortfolioForm from '@/components/EditPortfolioForm';
+import { formatQuantity } from '@/lib/utils/quantity';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -236,7 +237,7 @@ export default function PortfolioDetailPage({ params }: PageProps) {
                         <td className="text-right">
                           {formatCurrency(holding.asset.currentPrice)}
                         </td>
-                        <td className="text-right">{holding.quantity}</td>
+                        <td className="text-right">{formatQuantity(holding.quantity, holding.asset.type)}</td>
                         <td className="text-right">
                           <strong>{formatCurrency(holding.totalValue)}</strong>
                         </td>
